@@ -1,27 +1,635 @@
 {% extends 'base.html' %}
 {% block page_title %}Map View{% endblock %}
 
-{# Load Leaflet CSS in <head> via the head_extra block #}
+{# ============================================================
+   HEAD EXTRA — Leaflet CSS + map-specific overrides
+   ============================================================ #}
 {% block head_extra %}
 <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
 <style>
-  .page-body { padding: 0 !important; overflow: hidden !important; }
-  body        { overflow: hidden !important; }
+/* ── Reset page layout for full-screen map ── */
+.page-body { padding: 0 !important; overflow: hidden !important; }
+body        { overflow: hidden !important; }
+
+/* ════════════════════════════════════════════════════════════
+   MAP CONTAINER
+   ════════════════════════════════════════════════════════════ */
+.map-fullscreen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #0a0e17;
+}
+
+#atfm-map {
+    width: 100%;
+    height: 100%;
+    background: #0a0e17;
+    z-index: 1;
+}
+
+/* Dark-theme attribution */
+.leaflet-control-attribution {
+    background: rgba(14,17,23,0.82) !important;
+    color: #4a6080 !important;
+    border-top: 1px solid #252f3f !important;
+    font-size: 10px !important;
+    backdrop-filter: blur(4px);
+}
+.leaflet-control-attribution a { color: #0a84ff !important; }
+
+.leaflet-control-zoom {
+    border: 1px solid #252f3f !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+}
+.leaflet-control-zoom a {
+    background: rgba(22,28,39,0.92) !important;
+    color: #8899aa !important;
+    border-bottom: 1px solid #252f3f !important;
+    transition: background 0.2s, color 0.2s;
+}
+.leaflet-control-zoom a:hover {
+    background: rgba(10,132,255,0.25) !important;
+    color: #e6eaf2 !important;
+}
+
+/* ════════════════════════════════════════════════════════════
+   GLASS PANEL BASE
+   ════════════════════════════════════════════════════════════ */
+.map-panel {
+    position: absolute;
+    background: rgba(14,17,23,0.88);
+    border: 1px solid #252f3f;
+    border-radius: 12px;
+    color: #e6eaf2;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    z-index: 800;
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+/* ════════════════════════════════════════════════════════════
+   TOP-LEFT: STATS PANEL
+   ════════════════════════════════════════════════════════════ */
+.map-stats-panel {
+    top: 14px;
+    left: 14px;
+    width: 200px;
+    padding: 14px 16px;
+    pointer-events: none;
+}
+
+.map-brand {
+    font-weight: 700;
+    font-size: 14px;
+    color: #e6eaf2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #252f3f;
+    letter-spacing: 0.5px;
+}
+.map-brand i { color: #0a84ff; font-size: 15px; }
+
+.map-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 12px;
+    color: #8899aa;
+}
+
+.map-stat-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.map-utc-clock {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #252f3f;
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+    font-size: 12px;
+    color: #f5a623;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.map-utc-clock i { font-size: 11px; opacity: 0.7; }
+
+/* ════════════════════════════════════════════════════════════
+   TOP-RIGHT: LAYER CONTROLS
+   ════════════════════════════════════════════════════════════ */
+.map-layers-panel {
+    top: 14px;
+    right: 14px;
+    width: 210px;
+    padding: 14px 16px;
+}
+
+.map-panel-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: #8899aa;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 12px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid #252f3f;
+}
+
+.layer-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
+    padding-left: 4px;
+    padding-right: 4px;
+    margin: 0;
+}
+.layer-row:hover { background: rgba(255,255,255,0.05); }
+
+.layer-check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 1;
+    font-size: 12px;
+    color: #e6eaf2;
+    font-weight: 500;
+}
+.layer-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.layer-count {
+    font-size: 11px;
+    color: #4a6080;
+    font-family: 'IBM Plex Mono', monospace;
+    min-width: 20px;
+    text-align: right;
+}
+
+.layer-toggle {
+    width: 14px;
+    height: 14px;
+    accent-color: #0a84ff;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   LEFT SIDEBAR — FLIGHT LIST PANEL
+   ════════════════════════════════════════════════════════════ */
+.flight-list-panel {
+    top: 14px;
+    left: 14px;
+    bottom: 14px;
+    width: 300px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.flight-list-panel.collapsed {
+    transform: translateX(-320px);
+}
+
+.flight-list-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid #252f3f;
+    flex-shrink: 0;
+}
+
+.flight-list-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: #e6eaf2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.flight-list-title i { color: #0a84ff; }
+
+.flight-count-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: #8899aa;
+    background: rgba(10,132,255,0.12);
+    border: 1px solid rgba(10,132,255,0.2);
+    border-radius: 20px;
+    padding: 2px 8px;
+}
+
+.flight-search {
+    width: 100%;
+    background: rgba(10,132,255,0.06);
+    border: 1px solid #252f3f;
+    border-radius: 7px;
+    color: #e6eaf2;
+    font-size: 12px;
+    padding: 7px 10px 7px 30px;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    font-family: 'Inter', sans-serif;
+}
+.flight-search:focus {
+    border-color: #0a84ff;
+    background: rgba(10,132,255,0.10);
+}
+.flight-search::placeholder { color: #4a6080; }
+
+.flight-search-wrap {
+    position: relative;
+}
+.flight-search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #4a6080;
+    font-size: 11px;
+    pointer-events: none;
+}
+
+.flight-list-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #252f3f transparent;
+}
+.flight-list-body::-webkit-scrollbar { width: 4px; }
+.flight-list-body::-webkit-scrollbar-track { background: transparent; }
+.flight-list-body::-webkit-scrollbar-thumb {
+    background: #252f3f;
+    border-radius: 4px;
+}
+.flight-list-body::-webkit-scrollbar-thumb:hover { background: #2d3f5a; }
+
+/* Flight cards */
+.flight-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    margin-bottom: 4px;
+    animation: fade-in-up 0.3s ease both;
+}
+.flight-card:hover {
+    background: rgba(10,132,255,0.08);
+    border-color: rgba(10,132,255,0.2);
+    transform: translateX(2px);
+}
+.flight-card.active {
+    background: rgba(10,132,255,0.14);
+    border-color: rgba(10,132,255,0.4);
+}
+
+.flight-card-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+}
+
+.flight-card-info { flex: 1; min-width: 0; }
+
+.flight-card-callsign {
+    font-weight: 700;
+    font-size: 13px;
+    color: #e6eaf2;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.5px;
+}
+
+.flight-card-route {
+    font-size: 11px;
+    color: #8899aa;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.flight-card-airline {
+    font-size: 10px;
+    color: #4a6080;
+    margin-top: 1px;
+}
+
+.flight-status-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.flight-list-empty {
+    text-align: center;
+    color: #4a6080;
+    font-size: 12px;
+    padding: 32px 16px;
+}
+.flight-list-empty i { font-size: 24px; margin-bottom: 8px; display: block; opacity: 0.5; }
+
+/* Flight list toggle button */
+.flight-list-toggle-btn {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    transform: translateY(-50%);
+    z-index: 900;
+    background: rgba(14,17,23,0.88);
+    border: 1px solid #252f3f;
+    border-radius: 8px;
+    color: #8899aa;
+    width: 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, left 0.3s cubic-bezier(0.4,0,0.2,1);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+}
+.flight-list-toggle-btn:hover { background: rgba(10,132,255,0.2); color: #e6eaf2; }
+.flight-list-toggle-btn.panel-open { left: 326px; }
+
+/* ════════════════════════════════════════════════════════════
+   BOTTOM INFO BAR
+   ════════════════════════════════════════════════════════════ */
+.flight-info-bar {
+    position: absolute;
+    bottom: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(680px, calc(100% - 28px));
+    background: rgba(14,17,23,0.94);
+    border: 1px solid #252f3f;
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 850;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 -4px 32px rgba(0,0,0,0.5);
+    transition: bottom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+.flight-info-bar.visible {
+    bottom: 14px;
+    pointer-events: auto;
+}
+
+.fib-status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.fib-callsign {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 16px;
+    color: #e6eaf2;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+.fib-divider {
+    width: 1px;
+    height: 28px;
+    background: #252f3f;
+    flex-shrink: 0;
+}
+
+.fib-field { display: flex; flex-direction: column; gap: 2px; }
+.fib-label { font-size: 9px; color: #4a6080; text-transform: uppercase; letter-spacing: 0.6px; }
+.fib-value { font-size: 12px; color: #e6eaf2; font-weight: 500; }
+
+.fib-dismiss {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid #252f3f;
+    border-radius: 6px;
+    color: #4a6080;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+    font-size: 12px;
+}
+.fib-dismiss:hover { background: rgba(230,57,70,0.15); color: #e63946; border-color: #e63946; }
+
+/* ════════════════════════════════════════════════════════════
+   POPUP STYLES
+   ════════════════════════════════════════════════════════════ */
+.atfm-popup .leaflet-popup-content-wrapper {
+    background: rgba(14,17,23,0.96) !important;
+    border: 1px solid #252f3f !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    backdrop-filter: blur(16px);
+    color: #e6eaf2 !important;
+    padding: 0 !important;
+}
+.atfm-popup .leaflet-popup-content { margin: 0 !important; }
+.atfm-popup .leaflet-popup-tip-container { display: none; }
+.atfm-popup .leaflet-popup-close-button {
+    color: #4a6080 !important;
+    top: 6px !important;
+    right: 8px !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+}
+.atfm-popup .leaflet-popup-close-button:hover { color: #e6eaf2 !important; }
+
+.map-popup {
+    padding: 12px 14px;
+    min-width: 200px;
+}
+.map-popup-callsign {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 15px;
+    color: #e6eaf2;
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #252f3f;
+}
+.map-popup-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+    gap: 16px;
+}
+.map-popup-row span:first-child { color: #4a6080; }
+.map-popup-val {
+    font-weight: 600;
+    color: #8899aa;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   AIRPORT MARKER — pulsing div icon
+   ════════════════════════════════════════════════════════════ */
+.airport-marker-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.airport-marker-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px solid rgba(10,132,255,0.7);
+    animation: pulse-ring 2.4s ease-out infinite;
+    pointer-events: none;
+}
+.airport-marker-dot {
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #2ca7ff, #0a84ff);
+    border: 1.5px solid rgba(255,255,255,0.25);
+    box-shadow: 0 0 8px rgba(10,132,255,0.8), 0 0 2px #fff;
+    position: relative;
+    z-index: 2;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PLANE ICON
+   ════════════════════════════════════════════════════════════ */
+.plane-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 0 4px currentColor);
+}
+.plane-icon-wrap svg {
+    transition: transform 0.05s linear;
+}
+
+/* ════════════════════════════════════════════════════════════
+   KEYBOARD SHORTCUT HINT (bottom-right overlay)
+   ════════════════════════════════════════════════════════════ */
+.map-shortcut-hint {
+    position: absolute;
+    bottom: 46px;
+    right: 14px;
+    font-size: 10px;
+    color: #4a6080;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    pointer-events: none;
+    z-index: 800;
+}
+.shortcut-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.shortcut-key kbd {
+    background: rgba(22,28,39,0.9);
+    border: 1px solid #252f3f;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: #8899aa;
+}
+
+/* ════════════════════════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ════════════════════════════════════════════════════════════ */
+@keyframes pulse-ring {
+    0%   { transform: scale(0.85); opacity: 0.8; }
+    60%  { transform: scale(2.0);  opacity: 0.15; }
+    100% { transform: scale(2.6);  opacity: 0; }
+}
+
+@keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes plane-glow {
+    0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+    50%       { filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 14px currentColor); }
+}
+
+@keyframes route-draw {
+    from { stroke-dashoffset: 1; }
+    to   { stroke-dashoffset: 0; }
+}
+
+/* Route draw animation applied to Leaflet SVG paths */
+.leaflet-interactive.route-animate {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: route-draw 1.8s ease-out forwards;
+}
+
+/* Responsive: hide panel on very small screens */
+@media (max-width: 480px) {
+    .flight-list-panel { width: calc(100vw - 28px); }
+    .map-stats-panel   { display: none; }
+}
 </style>
 {% endblock %}
 
+{# ============================================================
+   CONTENT — map + all overlay panels
+   ============================================================ #}
 {% block content %}
+<div class="map-fullscreen" role="region" aria-label="ATFM flight route map" id="mapContainer">
 
-{# ═══════════════════════════════════════════════════════════
-   Full-screen map container — cancels page-body padding
-   ═══════════════════════════════════════════════════════════ #}
-<div class="map-fullscreen" role="region" aria-label="ATFM flight route map">
-
-    {# ── Leaflet map canvas ── #}
+    {# ── Leaflet canvas ── #}
     <div id="atfm-map" aria-label="Interactive map showing flight routes"></div>
 
-    {# ── TOP-LEFT: Branding + live stats ── #}
+    {# ── TOP-LEFT: Stats panel ── #}
     <div class="map-panel map-stats-panel" role="complementary" aria-label="Map statistics">
         <div class="map-brand">
             <i class="fa-solid fa-plane-departure" aria-hidden="true"></i>
@@ -31,18 +639,22 @@
             <span class="map-stat-dot" style="background:#0a84ff;" aria-hidden="true"></span>
             <span>{{ total_routes }} routes displayed</span>
         </div>
-        {% for status, cnt in status_counts.items() %}
         {% set dot_colors = {'DEPARTED':'#1eb87a','DELAYED':'#f5a623','CANCELLED':'#e63946','PLANNED':'#4a9eff'} %}
+        {% for status, cnt in status_counts.items() %}
         <div class="map-stat-row">
             <span class="map-stat-dot"
                   style="background:{{ dot_colors.get(status, '#4a6080') }};"
                   aria-hidden="true"></span>
-            <span>{{ status | title }}: {{ cnt }}</span>
+            <span>{{ status | title }}: <strong style="color:#e6eaf2;">{{ cnt }}</strong></span>
         </div>
         {% endfor %}
+        <div class="map-utc-clock">
+            <i class="fa-regular fa-clock" aria-hidden="true"></i>
+            <span id="map-utc-display">--:--:-- UTC</span>
+        </div>
     </div>
 
-    {# ── TOP-RIGHT: Layer toggle panel ── #}
+    {# ── TOP-RIGHT: Layer controls ── #}
     <div class="map-panel map-layers-panel" role="complementary" aria-label="Layer controls">
         <div class="map-panel-title">
             <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
@@ -100,38 +712,100 @@
         </label>
     </div>
 
-</div>
+    {# ── FLIGHT LIST TOGGLE BUTTON ── #}
+    <button class="flight-list-toggle-btn panel-open"
+            id="flightListToggleBtn"
+            aria-label="Toggle flight list"
+            aria-expanded="true"
+            aria-controls="flightListPanel">
+        <i class="fa-solid fa-chevron-left" id="flightListToggleIcon" aria-hidden="true"></i>
+    </button>
 
+    {# ── LEFT: Flight List Panel ── #}
+    <div class="map-panel flight-list-panel" id="flightListPanel"
+         role="complementary" aria-label="Flight list">
+
+        <div class="flight-list-header">
+            <div class="flight-list-title">
+                <i class="fa-solid fa-list-ul" aria-hidden="true"></i>
+                Flights
+                <span class="flight-count-badge" id="flightCountBadge">{{ total_routes }}</span>
+            </div>
+            <div class="flight-search-wrap">
+                <i class="fa-solid fa-search flight-search-icon" aria-hidden="true"></i>
+                <input type="search"
+                       class="flight-search"
+                       id="flightSearch"
+                       placeholder="Search callsign, airport, airline…"
+                       aria-label="Search flights"
+                       autocomplete="off">
+            </div>
+        </div>
+
+        <div class="flight-list-body" id="flightListBody" role="list">
+            {# Cards are rendered by JS — populated from ROUTES data #}
+        </div>
+    </div>
+
+    {# ── BOTTOM: Flight info bar ── #}
+    <div class="flight-info-bar" id="flightInfoBar" role="status" aria-live="polite" aria-label="Selected flight info">
+        <div class="fib-status-dot" id="fibDot"></div>
+        <div class="fib-callsign" id="fibCallsign">—</div>
+        <div class="fib-divider"></div>
+        <div class="fib-field">
+            <div class="fib-label">Route</div>
+            <div class="fib-value" id="fibRoute">—</div>
+        </div>
+        <div class="fib-divider"></div>
+        <div class="fib-field">
+            <div class="fib-label">Airline</div>
+            <div class="fib-value" id="fibAirline">—</div>
+        </div>
+        <div class="fib-divider"></div>
+        <div class="fib-field">
+            <div class="fib-label">Status</div>
+            <div class="fib-value" id="fibStatus">—</div>
+        </div>
+        <div class="fib-divider"></div>
+        <div class="fib-field">
+            <div class="fib-label">Delay</div>
+            <div class="fib-value" id="fibDelay">—</div>
+        </div>
+        <div class="fib-divider"></div>
+        <div class="fib-field">
+            <div class="fib-label">SOBT</div>
+            <div class="fib-value" id="fibSobt">—</div>
+        </div>
+        <button class="fib-dismiss" id="fibDismiss" aria-label="Close flight info">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    {# ── Keyboard shortcut hints ── #}
+    <div class="map-shortcut-hint" aria-hidden="true">
+        <div class="shortcut-key"><kbd>R</kbd> Reset view</div>
+        <div class="shortcut-key"><kbd>F</kbd> Toggle flights</div>
+    </div>
+
+</div>
 {% endblock %}
 
+{# ============================================================
+   SCRIPTS — Leaflet init + full interactivity
+   ============================================================ #}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 
 <script>
-/* ── data from Flask ── */
+/* ──────────────────────────────────────────────────────────────
+   DATA FROM FLASK
+────────────────────────────────────────────────────────────── */
 const AIRPORTS = {{ airports | tojson }};
 const ROUTES   = {{ routes   | tojson }};
 
-window.addEventListener('load', function () {
-'use strict';
-
-/* ════════════════════════════════════════════════════
-   FIT MAP HEIGHT — measures actual top of #atfm-map
-   so any banner/topbar combo is handled automatically.
-   ════════════════════════════════════════════════════ */
-function fitMapHeight() {
-    var el = document.getElementById('atfm-map');
-    if (!el) return;
-    var top = el.getBoundingClientRect().top;
-    var h   = Math.max(200, window.innerHeight - top);
-    el.parentElement.style.height = h + 'px';
-    el.style.height = h + 'px';
-}
-fitMapHeight();
-
-/* ════════════════════════════════════════════════════
-   PALETTE — ICAO/FAA status colours
-   ════════════════════════════════════════════════════ */
+/* ──────────────────────────────────────────────────────────────
+   CONSTANTS
+────────────────────────────────────────────────────────────── */
 const STATUS_COLOR = {
     PLANNED:   '#4a9eff',
     DEPARTED:  '#1eb87a',
@@ -140,25 +814,40 @@ const STATUS_COLOR = {
 };
 const STATUS_WEIGHT = {
     PLANNED:   1.5,
-    DEPARTED:  2.0,
+    DEPARTED:  2.2,
     DELAYED:   2.5,
-    CANCELLED: 2.0,
+    CANCELLED: 1.8,
 };
 const STATUS_OPACITY = {
-    PLANNED:   0.55,
-    DEPARTED:  0.80,
-    DELAYED:   0.90,
-    CANCELLED: 0.75,
+    PLANNED:   0.5,
+    DEPARTED:  0.85,
+    DELAYED:   0.92,
+    CANCELLED: 0.65,
 };
+const ARC_STEPS = 40;
 
-/* ════════════════════════════════════════════════════
-   INIT MAP — tile layer switches with day/night theme
-   ════════════════════════════════════════════════════ */
+/* ──────────────────────────────────────────────────────────────
+   FIT MAP HEIGHT
+────────────────────────────────────────────────────────────── */
+function fitMapHeight() {
+    var el = document.getElementById('atfm-map');
+    if (!el) return;
+    var top = el.getBoundingClientRect().top;
+    var h   = Math.max(200, window.innerHeight - top);
+    var wrap = document.getElementById('mapContainer');
+    if (wrap) wrap.style.height = h + 'px';
+    el.style.height = h + 'px';
+}
+fitMapHeight();
+
+/* ──────────────────────────────────────────────────────────────
+   MAP INIT
+────────────────────────────────────────────────────────────── */
 const TILES = {
     dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
 };
-const TILE_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>';
+const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 const isDark = () => document.documentElement.getAttribute('data-theme') !== 'light';
 
@@ -167,219 +856,587 @@ const map = L.map('atfm-map', {
     zoom: 4,
     zoomControl: false,
     attributionControl: true,
+    preferCanvas: false,
 });
 
-var tileLayer = L.tileLayer(isDark() ? TILES.dark : TILES.light,
-    { attribution: TILE_ATTR, subdomains: 'abcd', maxZoom: 19 }
-).addTo(map);
+let tileLayer = L.tileLayer(isDark() ? TILES.dark : TILES.light, {
+    attribution: TILE_ATTR,
+    subdomains: 'abcd',
+    maxZoom: 19,
+}).addTo(map);
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Swap tiles when theme toggles
 document.addEventListener('themechange', function () {
     tileLayer.setUrl(isDark() ? TILES.dark : TILES.light);
 });
 
-/* ════════════════════════════════════════════════════
-   LAYER GROUPS — one per status + airports
-   ════════════════════════════════════════════════════ */
+/* ──────────────────────────────────────────────────────────────
+   LAYER GROUPS
+────────────────────────────────────────────────────────────── */
 const layers = {
     PLANNED:   L.layerGroup().addTo(map),
     DEPARTED:  L.layerGroup().addTo(map),
     DELAYED:   L.layerGroup().addTo(map),
     CANCELLED: L.layerGroup().addTo(map),
     airports:  L.layerGroup().addTo(map),
+    planes:    L.layerGroup().addTo(map),
 };
 
-/* ════════════════════════════════════════════════════
-   HELPER — curved arc between two lat/lon points
-   Uses a mid-point offset to simulate a great-circle
-   visual effect on the Mercator projection.
-   ════════════════════════════════════════════════════ */
-function arcPoints(lat1, lon1, lat2, lon2, steps) {
-    steps = steps || 30;
-    const pts = [];
-    const dLat = lat2 - lat1;
-    const dLon = lon2 - lon1;
-    const dist = Math.sqrt(dLat * dLat + dLon * dLon);
-    // Arc height proportional to route distance
-    const lift = dist * 0.08;
+/* ──────────────────────────────────────────────────────────────
+   HELPERS
+────────────────────────────────────────────────────────────── */
 
-    for (let i = 0; i <= steps; i++) {
-        const t   = i / steps;
-        const lat = lat1 + dLat * t;
-        const lon = lon1 + dLon * t;
-        // Parabolic vertical offset
-        const offset = lift * 4 * t * (1 - t);
+/**
+ * Generate a parabolic arc of ARC_STEPS+1 points between two coords.
+ * lift = dist * 0.10 (parabolic offset perpendicular to chord).
+ */
+function arcPoints(lat1, lon1, lat2, lon2) {
+    var pts  = [];
+    var dLat = lat2 - lat1;
+    var dLon = lon2 - lon1;
+    var dist = Math.sqrt(dLat * dLat + dLon * dLon);
+    var lift = dist * 0.10;
+
+    for (var i = 0; i <= ARC_STEPS; i++) {
+        var t      = i / ARC_STEPS;
+        var lat    = lat1 + dLat * t;
+        var lon    = lon1 + dLon * t;
+        var offset = lift * 4 * t * (1 - t); // parabola peaks at t=0.5
         pts.push([lat + offset, lon]);
     }
     return pts;
 }
 
-/* ════════════════════════════════════════════════════
-   HELPER — popup HTML for a route
-   ════════════════════════════════════════════════════ */
-function routePopup(rt) {
-    const color  = STATUS_COLOR[rt.status] || '#4a6080';
-    const status = rt.status || '—';
-    const delay  = (rt.delay !== null && rt.delay !== undefined)
-        ? (rt.delay <= 0 ? '<span style="color:#1eb87a;">On time</span>'
-          : rt.delay <= 15 ? '<span style="color:#1eb87a;">+' + rt.delay + 'm</span>'
-          : rt.delay <= 60 ? '<span style="color:#f5a623;">+' + rt.delay + 'm</span>'
-          : '<span style="color:#e63946;">+' + rt.delay + 'm</span>')
+/** Haversine distance in km */
+function haversineKm(lat1, lon1, lat2, lon2) {
+    var R  = 6371;
+    var dL = (lat2 - lat1) * Math.PI / 180;
+    var dG = (lon2 - lon1) * Math.PI / 180;
+    var a  = Math.sin(dL/2) * Math.sin(dL/2) +
+             Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+             Math.sin(dG/2) * Math.sin(dG/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Build popup HTML for a route */
+function routePopupHtml(rt) {
+    var color  = STATUS_COLOR[rt.status] || '#4a6080';
+    var delay  = (rt.delay !== null && rt.delay !== undefined)
+        ? (rt.delay <= 0
+            ? '<span style="color:#1eb87a;">On time</span>'
+            : rt.delay <= 15
+                ? '<span style="color:#1eb87a;">+' + rt.delay + 'm</span>'
+                : rt.delay <= 60
+                    ? '<span style="color:#f5a623;">+' + rt.delay + 'm</span>'
+                    : '<span style="color:#e63946;">+' + rt.delay + 'm</span>')
         : '—';
 
     return '<div class="map-popup">' +
         '<div class="map-popup-callsign">' +
             '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;' +
-            'background:' + color + ';margin-right:4px;flex-shrink:0;' +
-            'box-shadow:0 0 6px ' + color + '88;"></span>' +
+            'background:' + color + ';margin-right:6px;flex-shrink:0;' +
+            'box-shadow:0 0 6px ' + color + '88;vertical-align:middle;"></span>' +
             rt.callsign +
         '</div>' +
         '<div class="map-popup-row"><span>Route</span>' +
             '<span class="map-popup-val">' + rt.origin + ' → ' + rt.dest + '</span></div>' +
         '<div class="map-popup-row"><span>Airline</span>' +
-            '<span class="map-popup-val">' + rt.airline + '</span></div>' +
+            '<span class="map-popup-val">' + (rt.airline_name || rt.airline) + '</span></div>' +
         '<div class="map-popup-row"><span>SOBT</span>' +
-            '<span class="map-popup-val">' + rt.sobt + ' UTC</span></div>' +
+            '<span class="map-popup-val">' + (rt.sobt || '—') + ' UTC</span></div>' +
         '<div class="map-popup-row"><span>Status</span>' +
-            '<span class="map-popup-val" style="color:' + color + ';">' + status + '</span></div>' +
+            '<span class="map-popup-val" style="color:' + color + ';">' + (rt.status || '—') + '</span></div>' +
         '<div class="map-popup-row"><span>Delay</span>' +
             '<span class="map-popup-val">' + delay + '</span></div>' +
         '</div>';
 }
 
-/* ════════════════════════════════════════════════════
-   DRAW ROUTES
-   ════════════════════════════════════════════════════ */
-ROUTES.forEach(function (rt) {
-    const status = rt.status || 'PLANNED';
-    const color  = STATUS_COLOR[status]   || '#4a6080';
-    const weight = STATUS_WEIGHT[status]  || 1.5;
-    const opac   = STATUS_OPACITY[status] || 0.6;
-    const layer  = layers[status] || layers.PLANNED;
+/** Build plane SVG markup for a given color and rotation */
+function planeSvg(color, bearing) {
+    return '<div class="plane-icon-wrap" style="color:' + color + ';animation:plane-glow 2s ease-in-out infinite;">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" ' +
+        'fill="' + color + '" style="transform:rotate(' + (bearing + 90) + 'deg);display:block;">' +
+        '<path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>' +
+        '</svg></div>';
+}
 
-    const pts = arcPoints(
+/* ──────────────────────────────────────────────────────────────
+   CURRENTLY SELECTED FLIGHT (for info bar & highlight)
+────────────────────────────────────────────────────────────── */
+var selectedRouteId = null;
+var routeLineMap    = {}; // routeId -> { line, glowLine, pts, status }
+var routeCardMap    = {}; // routeId -> DOM element
+
+/* ──────────────────────────────────────────────────────────────
+   SELECT A FLIGHT: update info bar, highlight arc, pan map
+────────────────────────────────────────────────────────────── */
+function selectFlight(rt) {
+    // Deselect previous
+    if (selectedRouteId !== null && routeLineMap[selectedRouteId]) {
+        var prev = routeLineMap[selectedRouteId];
+        var prevColor   = STATUS_COLOR[prev.status] || '#4a6080';
+        var prevWeight  = STATUS_WEIGHT[prev.status] || 1.5;
+        var prevOpacity = STATUS_OPACITY[prev.status] || 0.6;
+        prev.line.setStyle({ weight: prevWeight, opacity: prevOpacity, color: prevColor });
+        prev.glowLine.setStyle({ weight: prevWeight + 3, opacity: prevOpacity * 0.25, color: prevColor });
+    }
+    if (selectedRouteId !== null && routeCardMap[selectedRouteId]) {
+        routeCardMap[selectedRouteId].classList.remove('active');
+    }
+
+    selectedRouteId = rt.id;
+
+    // Highlight arc
+    if (routeLineMap[rt.id]) {
+        var info   = routeLineMap[rt.id];
+        var color  = STATUS_COLOR[rt.status] || '#4a6080';
+        info.line.setStyle({ weight: 4, opacity: 1, color: color });
+        info.glowLine.setStyle({ weight: 9, opacity: 0.45, color: color });
+
+        // Pan map to midpoint of arc
+        var pts    = info.pts;
+        var mid    = pts[Math.floor(pts.length / 2)];
+        map.panTo(mid, { animate: true, duration: 0.6 });
+        info.line.openPopup(mid);
+    }
+
+    // Highlight card
+    if (routeCardMap[rt.id]) {
+        routeCardMap[rt.id].classList.add('active');
+        routeCardMap[rt.id].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Update info bar
+    var color  = STATUS_COLOR[rt.status] || '#4a6080';
+    var delay  = (rt.delay !== null && rt.delay !== undefined)
+        ? (rt.delay <= 0 ? 'On time' : '+' + rt.delay + 'm') : '—';
+    document.getElementById('fibDot').style.cssText = 'background:' + color + ';box-shadow:0 0 6px ' + color + ';width:12px;height:12px;border-radius:50%;flex-shrink:0;';
+    document.getElementById('fibCallsign').textContent  = rt.callsign;
+    document.getElementById('fibRoute').textContent     = rt.origin + ' → ' + rt.dest;
+    document.getElementById('fibAirline').textContent   = rt.airline_name || rt.airline;
+    document.getElementById('fibStatus').textContent    = rt.status;
+    document.getElementById('fibStatus').style.color    = color;
+    document.getElementById('fibDelay').textContent     = delay;
+    document.getElementById('fibSobt').textContent      = (rt.sobt || '—') + ' UTC';
+    document.getElementById('flightInfoBar').classList.add('visible');
+}
+
+function dismissInfoBar() {
+    document.getElementById('flightInfoBar').classList.remove('visible');
+    // Deselect
+    if (selectedRouteId !== null && routeLineMap[selectedRouteId]) {
+        var prev = routeLineMap[selectedRouteId];
+        var prevColor   = STATUS_COLOR[prev.status] || '#4a6080';
+        var prevWeight  = STATUS_WEIGHT[prev.status] || 1.5;
+        var prevOpacity = STATUS_OPACITY[prev.status] || 0.6;
+        prev.line.setStyle({ weight: prevWeight, opacity: prevOpacity, color: prevColor });
+        prev.glowLine.setStyle({ weight: prevWeight + 3, opacity: prevOpacity * 0.25, color: prevColor });
+    }
+    if (selectedRouteId !== null && routeCardMap[selectedRouteId]) {
+        routeCardMap[selectedRouteId].classList.remove('active');
+    }
+    selectedRouteId = null;
+}
+
+document.getElementById('fibDismiss').addEventListener('click', dismissInfoBar);
+
+/* ──────────────────────────────────────────────────────────────
+   DRAW ROUTES WITH ANIMATED ARCS
+────────────────────────────────────────────────────────────── */
+ROUTES.forEach(function (rt, idx) {
+    var status  = rt.status || 'PLANNED';
+    var color   = STATUS_COLOR[status]   || '#4a6080';
+    var weight  = STATUS_WEIGHT[status]  || 1.5;
+    var opacity = STATUS_OPACITY[status] || 0.6;
+    var layer   = layers[status] || layers.PLANNED;
+
+    var pts = arcPoints(
         rt.orig_lat, rt.orig_lon,
         rt.dest_lat, rt.dest_lon
     );
 
-    // Glow effect: thicker transparent line underneath
-    L.polyline(pts, {
-        color:   color,
-        weight:  weight + 3,
-        opacity: opac * 0.25,
+    // Glow underlay
+    var glowLine = L.polyline(pts, {
+        color:        color,
+        weight:       weight + 3,
+        opacity:      opacity * 0.25,
+        smoothFactor: 1,
+        interactive:  false,
+    }).addTo(layer);
+
+    // Main line
+    var line = L.polyline(pts, {
+        color:        color,
+        weight:       weight,
+        opacity:      opacity,
         smoothFactor: 1,
     }).addTo(layer);
 
-    // Main route line
-    const line = L.polyline(pts, {
-        color:   color,
-        weight:  weight,
-        opacity: opac,
-        smoothFactor: 1,
-    }).addTo(layer);
+    // Stagger the CSS draw animation via inline style on the SVG path element
+    // We use a small delay after render to apply the animation class
+    (function (l, delay) {
+        setTimeout(function () {
+            var el = l.getElement();
+            if (el) {
+                el.style.strokeDasharray  = '1';
+                el.style.strokeDashoffset = '1';
+                el.style.animation = 'route-draw 1.8s ease-out ' + delay + 'ms forwards';
+            }
+        }, 50);
+    })(line, idx * 60);
 
-    // Direction arrow at midpoint
-    const midIdx = Math.floor(pts.length / 2);
-    if (pts.length > 2) {
-        const p1 = pts[midIdx - 1];
-        const p2 = pts[midIdx + 1];
-        const bearing = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
-        const arrowIcon = L.divIcon({
+    // Arrow at midpoint
+    var midIdx = Math.floor(pts.length / 2);
+    if (pts.length > 3) {
+        var p1      = pts[midIdx - 1];
+        var p2      = pts[midIdx + 1];
+        var bearing = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
+        var arrowIcon = L.divIcon({
             className: '',
-            html: '<div style="color:' + color + ';opacity:' + (opac + 0.1) + ';' +
-                  'font-size:11px;transform:rotate(' + bearing + 'deg);' +
-                  'text-shadow:0 0 4px #000;">▶</div>',
-            iconSize: [12, 12],
+            html: '<div style="color:' + color + ';opacity:' + Math.min(opacity + 0.15, 1) + ';' +
+                  'font-size:10px;transform:rotate(' + bearing + 'deg);' +
+                  'text-shadow:0 0 4px #000;line-height:1;">&#9658;</div>',
+            iconSize:   [12, 12],
             iconAnchor: [6, 6],
         });
         L.marker(pts[midIdx], { icon: arrowIcon, interactive: false }).addTo(layer);
     }
 
-    line.bindPopup(routePopup(rt), {
-        maxWidth: 260,
+    // Popup
+    line.bindPopup(routePopupHtml(rt), {
+        maxWidth:  260,
         className: 'atfm-popup',
     });
 
-    // Highlight on hover
+    // Hover highlight
     line.on('mouseover', function () {
-        this.setStyle({ weight: weight + 2, opacity: Math.min(opac + 0.2, 1) });
+        if (selectedRouteId !== rt.id) {
+            this.setStyle({ weight: weight + 2, opacity: Math.min(opacity + 0.2, 1) });
+        }
     });
     line.on('mouseout', function () {
-        this.setStyle({ weight: weight, opacity: opac });
+        if (selectedRouteId !== rt.id) {
+            this.setStyle({ weight: weight, opacity: opacity });
+        }
     });
+
+    // Click to select
+    line.on('click', function () {
+        selectFlight(rt);
+    });
+
+    // Store references
+    routeLineMap[rt.id] = { line: line, glowLine: glowLine, pts: pts, status: status };
 });
 
-/* ════════════════════════════════════════════════════
-   DRAW AIRPORT MARKERS
-   Radius scaled by operation count
-   ════════════════════════════════════════════════════ */
-const maxOps = Math.max.apply(null, AIRPORTS.map(function (a) { return a.ops; })) || 1;
+/* ──────────────────────────────────────────────────────────────
+   ANIMATED PLANE ICONS (DEPARTED + DELAYED only)
+────────────────────────────────────────────────────────────── */
+var animatedFlights = []; // { marker, pts, duration, color }
+
+ROUTES.forEach(function (rt) {
+    var status = rt.status;
+    if (status !== 'DEPARTED' && status !== 'DELAYED') return;
+
+    var color = STATUS_COLOR[status];
+    var pts   = routeLineMap[rt.id] ? routeLineMap[rt.id].pts : arcPoints(
+        rt.orig_lat, rt.orig_lon, rt.dest_lat, rt.dest_lon
+    );
+
+    var distKm   = haversineKm(rt.orig_lat, rt.orig_lon, rt.dest_lat, rt.dest_lon);
+    var duration = Math.max(8000, distKm * 80);
+
+    // Initial plane icon
+    var planeIcon = L.divIcon({
+        className:  '',
+        html:       planeSvg(color, 0),
+        iconSize:   [18, 18],
+        iconAnchor: [9, 9],
+    });
+
+    var marker = L.marker(pts[0], {
+        icon:        planeIcon,
+        interactive: false,
+        zIndexOffset: 500,
+    }).addTo(layers.planes);
+
+    animatedFlights.push({ marker: marker, pts: pts, duration: duration, color: color });
+});
+
+/* Animation loop using requestAnimationFrame */
+function animatePlanes() {
+    var now = Date.now();
+    for (var i = 0; i < animatedFlights.length; i++) {
+        var f    = animatedFlights[i];
+        var pts  = f.pts;
+        var n    = pts.length;
+        if (n < 2) continue;
+
+        var t       = (now % f.duration) / f.duration;
+        var rawIdx  = t * (n - 1);
+        var idx     = Math.floor(rawIdx);
+        var frac    = rawIdx - idx;
+        var nextIdx = Math.min(idx + 1, n - 1);
+
+        var lat = pts[idx][0] + (pts[nextIdx][0] - pts[idx][0]) * frac;
+        var lon = pts[idx][1] + (pts[nextIdx][1] - pts[idx][1]) * frac;
+
+        var bearing = Math.atan2(
+            pts[nextIdx][1] - pts[idx][1],
+            pts[nextIdx][0] - pts[idx][0]
+        ) * 180 / Math.PI;
+
+        f.marker.setLatLng([lat, lon]);
+
+        // Update rotation via icon HTML replacement
+        f.marker.setIcon(L.divIcon({
+            className:  '',
+            html:       planeSvg(f.color, bearing),
+            iconSize:   [18, 18],
+            iconAnchor: [9, 9],
+        }));
+    }
+    requestAnimationFrame(animatePlanes);
+}
+
+if (animatedFlights.length > 0) {
+    requestAnimationFrame(animatePlanes);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   PULSING AIRPORT MARKERS
+────────────────────────────────────────────────────────────── */
+var maxOps = 1;
+AIRPORTS.forEach(function (a) { if (a.ops > maxOps) maxOps = a.ops; });
 
 AIRPORTS.forEach(function (ap) {
-    const radius = 4 + Math.round((ap.ops / maxOps) * 10);
-    const marker = L.circleMarker([ap.lat, ap.lon], {
-        radius:      radius,
-        color:       '#0a84ff',
-        fillColor:   '#0a84ff',
-        fillOpacity: 0.75,
-        weight:      1.5,
-        opacity:     0.9,
-    }).addTo(layers.airports);
+    var ratio    = Math.max(0.1, ap.ops / maxOps);
+    var dotSize  = Math.round(6 + ratio * 10);   // 6–16 px
+    var ringSize = dotSize + 4;
+
+    var icon = L.divIcon({
+        className: '',
+        html: '<div class="airport-marker-wrap" style="width:' + (ringSize * 3) + 'px;height:' + (ringSize * 3) + 'px;">' +
+              '<div class="airport-marker-ring" style="width:' + ringSize + 'px;height:' + ringSize + 'px;' +
+              'animation-delay:' + (Math.random() * 1.5).toFixed(2) + 's;"></div>' +
+              '<div class="airport-marker-dot" style="width:' + dotSize + 'px;height:' + dotSize + 'px;"></div>' +
+              '</div>',
+        iconSize:   [ringSize * 3, ringSize * 3],
+        iconAnchor: [ringSize * 1.5, ringSize * 1.5],
+    });
+
+    var marker = L.marker([ap.lat, ap.lon], { icon: icon }).addTo(layers.airports);
 
     marker.bindTooltip(
-        '<strong>' + ap.code + '</strong><br>' +
-        '<span style="color:#8899aa;font-size:10px;">' + ap.name + '</span><br>' +
-        '<span style="color:#4a9eff;">' + ap.ops + ' operations</span>',
-        { permanent: false, direction: 'top', offset: [0, -radius] }
+        '<strong style="font-family:\'IBM Plex Mono\',monospace;">' + ap.code + '</strong>' +
+        '<br><span style="color:#8899aa;font-size:11px;">' + ap.name + '</span>' +
+        '<br><span style="color:#4a9eff;font-size:11px;">' + ap.ops + ' operations</span>',
+        {
+            permanent:  false,
+            direction:  'top',
+            offset:     [0, -(dotSize / 2 + 4)],
+            className:  'atfm-tooltip',
+        }
     );
 });
 
-/* ════════════════════════════════════════════════════
-   FIT BOUNDS to all airports
-   ════════════════════════════════════════════════════ */
+/* ──────────────────────────────────────────────────────────────
+   FIT BOUNDS
+────────────────────────────────────────────────────────────── */
 if (AIRPORTS.length > 0) {
-    const bounds = L.latLngBounds(AIRPORTS.map(function (a) { return [a.lat, a.lon]; }));
-    map.fitBounds(bounds, { padding: [40, 40] });
+    var bounds = L.latLngBounds(AIRPORTS.map(function (a) { return [a.lat, a.lon]; }));
+    map.fitBounds(bounds, { padding: [50, 50] });
+} else if (ROUTES.length > 0) {
+    var pts = [];
+    ROUTES.forEach(function (r) {
+        pts.push([r.orig_lat, r.orig_lon]);
+        pts.push([r.dest_lat, r.dest_lon]);
+    });
+    map.fitBounds(L.latLngBounds(pts), { padding: [50, 50] });
 }
 
-/* ════════════════════════════════════════════════════
+/* ──────────────────────────────────────────────────────────────
+   FLIGHT LIST PANEL
+────────────────────────────────────────────────────────────── */
+var flightListOpen = true;
+
+function buildFlightCards(filterText) {
+    var body  = document.getElementById('flightListBody');
+    var badge = document.getElementById('flightCountBadge');
+    body.innerHTML = '';
+
+    var q = (filterText || '').toLowerCase().trim();
+    var shown = 0;
+
+    ROUTES.forEach(function (rt, idx) {
+        if (q) {
+            var haystack = [
+                rt.callsign, rt.origin, rt.dest,
+                rt.airline, rt.airline_name
+            ].join(' ').toLowerCase();
+            if (haystack.indexOf(q) === -1) return;
+        }
+
+        shown++;
+        var status = rt.status || 'PLANNED';
+        var color  = STATUS_COLOR[status] || '#4a6080';
+
+        // Status badge colors
+        var badgeBg = {
+            PLANNED:   'rgba(74,158,255,0.15)',
+            DEPARTED:  'rgba(30,184,122,0.15)',
+            DELAYED:   'rgba(245,166,35,0.15)',
+            CANCELLED: 'rgba(230,57,70,0.15)',
+        }[status] || 'rgba(74,96,128,0.15)';
+
+        var card = document.createElement('div');
+        card.className   = 'flight-card' + (selectedRouteId === rt.id ? ' active' : '');
+        card.role        = 'listitem';
+        card.tabIndex    = 0;
+        card.style.animationDelay = (idx * 30) + 'ms';
+        card.innerHTML   =
+            '<div class="flight-card-dot" style="background:' + color + ';"></div>' +
+            '<div class="flight-card-info">' +
+                '<div class="flight-card-callsign">' + rt.callsign + '</div>' +
+                '<div class="flight-card-route">' + rt.origin + ' &rarr; ' + rt.dest + '</div>' +
+                '<div class="flight-card-airline">' + (rt.airline_name || rt.airline) + '</div>' +
+            '</div>' +
+            '<span class="flight-status-badge" style="background:' + badgeBg + ';color:' + color + ';border:1px solid ' + color + '44;">' +
+                status +
+            '</span>';
+
+        card.addEventListener('click', function () {
+            selectFlight(rt);
+        });
+        card.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectFlight(rt); }
+        });
+
+        body.appendChild(card);
+        routeCardMap[rt.id] = card;
+    });
+
+    if (shown === 0) {
+        body.innerHTML =
+            '<div class="flight-list-empty">' +
+            '<i class="fa-solid fa-plane-slash" aria-hidden="true"></i>' +
+            (q ? 'No flights match "' + filterText + '"' : 'No flights to display') +
+            '</div>';
+    }
+
+    badge.textContent = shown;
+}
+
+buildFlightCards('');
+
+document.getElementById('flightSearch').addEventListener('input', function () {
+    buildFlightCards(this.value);
+});
+
+/* Panel toggle */
+var toggleBtn  = document.getElementById('flightListToggleBtn');
+var toggleIcon = document.getElementById('flightListToggleIcon');
+var listPanel  = document.getElementById('flightListPanel');
+var statsPanel = document.querySelector('.map-stats-panel');
+
+function setFlightListOpen(open) {
+    flightListOpen = open;
+    if (open) {
+        listPanel.classList.remove('collapsed');
+        toggleBtn.classList.add('panel-open');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        toggleIcon.className = 'fa-solid fa-chevron-left';
+        // Shift stats panel right
+        if (statsPanel) statsPanel.style.left = '326px';
+    } else {
+        listPanel.classList.add('collapsed');
+        toggleBtn.classList.remove('panel-open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleIcon.className = 'fa-solid fa-chevron-right';
+        if (statsPanel) statsPanel.style.left = '14px';
+    }
+}
+
+// Start open, stats panel shifted
+if (statsPanel) statsPanel.style.left = '326px';
+
+toggleBtn.addEventListener('click', function () {
+    setFlightListOpen(!flightListOpen);
+});
+
+/* ──────────────────────────────────────────────────────────────
    LAYER TOGGLE CONTROLS
-   ════════════════════════════════════════════════════ */
+────────────────────────────────────────────────────────────── */
 document.querySelectorAll('.layer-toggle').forEach(function (chk) {
     chk.addEventListener('change', function () {
-        const status = this.dataset.status;
-        const layer  = layers[status];
+        var status = this.dataset.status;
+        var layer  = layers[status];
         if (!layer) return;
         if (this.checked) {
             map.addLayer(layer);
+            // Also show/hide planes layer for departed/delayed
+            if (status === 'DEPARTED' || status === 'DELAYED') {
+                // Handled by planes layer staying visible always
+            }
         } else {
             map.removeLayer(layer);
         }
     });
 });
 
-/* ════════════════════════════════════════════════════
-   KEYBOARD: Reset view on 'R'
-   ════════════════════════════════════════════════════ */
+/* ──────────────────────────────────────────────────────────────
+   UTC CLOCK (map panel)
+────────────────────────────────────────────────────────────── */
+(function () {
+    var el = document.getElementById('map-utc-display');
+    function tick() {
+        var n = new Date();
+        var h = String(n.getUTCHours()).padStart(2, '0');
+        var m = String(n.getUTCMinutes()).padStart(2, '0');
+        var s = String(n.getUTCSeconds()).padStart(2, '0');
+        if (el) el.textContent = h + ':' + m + ':' + s + ' UTC';
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
+
+/* ──────────────────────────────────────────────────────────────
+   KEYBOARD SHORTCUTS
+────────────────────────────────────────────────────────────── */
 document.addEventListener('keydown', function (e) {
+    // Ignore if focus is in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
     if (e.key === 'r' || e.key === 'R') {
+        // Reset view
         if (AIRPORTS.length > 0) {
-            const bounds = L.latLngBounds(AIRPORTS.map(function (a) { return [a.lat, a.lon]; }));
-            map.fitBounds(bounds, { padding: [40, 40] });
+            var b = L.latLngBounds(AIRPORTS.map(function (a) { return [a.lat, a.lon]; }));
+            map.fitBounds(b, { padding: [50, 50] });
         }
+    }
+    if (e.key === 'f' || e.key === 'F') {
+        setFlightListOpen(!flightListOpen);
+    }
+    if (e.key === 'Escape') {
+        dismissInfoBar();
     }
 });
 
-/* ════════════════════════════════════════════════════
-   RESIZE: refit map height when window is resized
-   ════════════════════════════════════════════════════ */
+/* ──────────────────────────────────────────────────────────────
+   RESIZE HANDLER
+────────────────────────────────────────────────────────────── */
 window.addEventListener('resize', function () {
     fitMapHeight();
     map.invalidateSize();
 });
 
-}); // end window.load
+/* ──────────────────────────────────────────────────────────────
+   CLOSE INFO BAR ON MAP CLICK (not on a marker/line)
+────────────────────────────────────────────────────────────── */
+map.on('click', function () {
+    dismissInfoBar();
+});
+
 </script>
 {% endblock %}
