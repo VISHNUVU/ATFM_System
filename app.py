@@ -1311,4 +1311,4 @@ def api_alerts_count():
 # ================================================
 if __name__ == '__main__':
     # Port 8080 used because macOS AirPlay occupies port 5000
-    app.run(port=8080, debug=True)
+    app.run(port=8081, debug=True)
