@@ -1,0 +1,306 @@
+-- ================================================
+-- ATFM PROJECT - DAY 3 SQL QUERIES
+-- Date: 07 April 2026
+-- Goal: Create master and transaction tables
+--       and fill with real BTS 2020 data
+-- ================================================
+
+-- ------------------------------------------------
+-- WHAT WE DID IN DAY 3:
+-- Step 1: Created airline_master table
+-- Step 2: Created airport_master table
+-- Step 3: Created flight_plan table
+-- Step 4: Created flight_operation table
+-- Step 5: Inserted 16 real airlines from BTS
+-- Step 6: Inserted 42 real airports from BTS
+-- Step 7: Inserted 15 real flights from BTS
+-- Step 8: Inserted 15 real operations from BTS
+-- Step 9: Verified with JOIN query
+-- ------------------------------------------------
+
+-- ================================================
+-- STEP 1: CREATE airline_master TABLE
+-- Purpose: Stores list of all airlines
+-- PK: airline_code
+-- ================================================
+CREATE TABLE airline_master (
+    airline_code VARCHAR(5) PRIMARY KEY,
+    airline_name VARCHAR(100) NOT NULL
+);
+
+-- ================================================
+-- STEP 2: CREATE airport_master TABLE
+-- Purpose: Stores list of all airports
+-- PK: airport_code
+-- ================================================
+CREATE TABLE airport_master (
+    airport_code VARCHAR(5) PRIMARY KEY,
+    airport_name VARCHAR(100) NOT NULL
+);
+
+-- ================================================
+-- STEP 3: CREATE flight_plan TABLE
+-- Purpose: Stores all planned flight details
+-- PK: flight_plan_id
+-- FK: airline_code → airline_master
+-- FK: origin → airport_master
+-- FK: destination → airport_master
+-- FK: created_by → app_user
+-- ================================================
+CREATE TABLE flight_plan (
+    flight_plan_id  SERIAL PRIMARY KEY,
+    flight_no       VARCHAR(10),
+    airline_code    VARCHAR(5) REFERENCES
+                    airline_master(airline_code),
+    origin          VARCHAR(5) REFERENCES
+                    airport_master(airport_code),
+    destination     VARCHAR(5) REFERENCES
+                    airport_master(airport_code),
+    sobt            TIMESTAMPTZ,
+    created_by      INT REFERENCES
+                    app_user(user_id)
+);
+
+-- ================================================
+-- STEP 4: CREATE flight_operation TABLE
+-- Purpose: Stores actual flight status and times
+-- PK: op_id
+-- FK: flight_plan_id → flight_plan
+-- ================================================
+CREATE TABLE flight_operation (
+    op_id           SERIAL PRIMARY KEY,
+    flight_plan_id  INT REFERENCES
+                    flight_plan(flight_plan_id),
+    aobt            TIMESTAMPTZ,
+    atot            TIMESTAMPTZ,
+    stand           VARCHAR(10),
+    runway          VARCHAR(10),
+    status          VARCHAR(20)
+);
+
+-- ================================================
+-- STEP 5: INSERT 16 AIRLINES
+-- Source: Real BTS 2020 dataset airlines
+-- ================================================
+INSERT INTO airline_master
+(airline_code, airline_name) VALUES
+('AA', 'American Airlines'),
+('UA', 'United Airlines'),
+('F9', 'Frontier Airlines'),
+('DL', 'Delta Air Lines'),
+('AS', 'Alaska Airlines'),
+('B6', 'JetBlue Airways'),
+('NK', 'Spirit Airlines'),
+('WN', 'Southwest Airlines'),
+('MQ', 'Envoy Air'),
+('OH', 'PSA Airlines'),
+('OO', 'SkyWest Airlines'),
+('EV', 'ExpressJet Airlines'),
+('9E', 'Endeavor Air'),
+('YV', 'Mesa Airlines'),
+('YX', 'Republic Airways'),
+('G4', 'Allegiant Air');
+
+-- ================================================
+-- STEP 6: INSERT 42 AIRPORTS
+-- Source: Real BTS 2020 dataset airports
+-- ================================================
+INSERT INTO airport_master
+(airport_code, airport_name) VALUES
+('PHX', 'Phoenix Sky Harbor International'),
+('CLT', 'Charlotte Douglas International'),
+('DEN', 'Denver International'),
+('RDU', 'Raleigh Durham International'),
+('LAX', 'Los Angeles International'),
+('EWR', 'Newark Liberty International'),
+('MIA', 'Miami International'),
+('JFK', 'New York John F Kennedy International'),
+('ORD', 'Chicago O Hare International'),
+('SFO', 'San Francisco International'),
+('SEA', 'Seattle Tacoma International'),
+('ANC', 'Ted Stevens Anchorage International'),
+('LAS', 'Harry Reid International'),
+('AUS', 'Austin Bergstrom International'),
+('FLL', 'Fort Lauderdale Hollywood International'),
+('TPA', 'Tampa International'),
+('PHL', 'Philadelphia International'),
+('SJU', 'Luis Munoz Marin International'),
+('MSP', 'Minneapolis Saint Paul International'),
+('SMF', 'Sacramento International'),
+('IAH', 'George Bush Intercontinental'),
+('ATL', 'Hartsfield Jackson Atlanta International'),
+('DTW', 'Detroit Metropolitan Wayne County'),
+('MCO', 'Orlando International'),
+('TUS', 'Tucson International'),
+('RNO', 'Reno Tahoe International'),
+('PDX', 'Portland International'),
+('FAR', 'Hector International'),
+('AGS', 'Augusta Regional'),
+('PSP', 'Palm Springs International'),
+('SLC', 'Salt Lake City International'),
+('SBP', 'San Luis Obispo County Regional'),
+('EYW', 'Key West International'),
+('AMA', 'Rick Husband Amarillo International'),
+('CHO', 'Charlottesville Albemarle'),
+('ELP', 'El Paso International'),
+('OKC', 'Will Rogers World'),
+('SAN', 'San Diego International'),
+('MKE', 'Milwaukee Mitchell International'),
+('STT', 'Cyril E King'),
+('IND', 'Indianapolis International'),
+('STL', 'St Louis Lambert International');
+
+-- ================================================
+-- STEP 7: INSERT 15 REAL FLIGHT PLANS
+-- Source: Real BTS 2020 CSV rows 2-28
+-- Verified against original dataset
+-- ================================================
+INSERT INTO flight_plan
+(flight_no, airline_code, origin,
+destination, sobt, created_by)
+VALUES
+('AA_PHX_CLT', 'AA', 'PHX', 'CLT',
+'2020-01-01 00:05:00+00', 2),  -- CSV Row 2
+
+('F9_DEN_RDU', 'F9', 'DEN', 'RDU',
+'2020-01-01 00:05:00+00', 2),  -- CSV Row 3
+
+('UA_LAX_EWR', 'UA', 'LAX', 'EWR',
+'2020-01-01 00:15:00+00', 2),  -- CSV Row 4
+
+('AA_PHX_MIA', 'AA', 'PHX', 'MIA',
+'2020-01-01 00:20:00+00', 2),  -- CSV Row 5
+
+('AA_PHX_JFK', 'AA', 'PHX', 'JFK',
+'2020-01-01 00:23:00+00', 2),  -- CSV Row 7
+
+('F9_DEN_MIA', 'F9', 'DEN', 'MIA',
+'2020-01-01 00:29:00+00', 2),  -- CSV Row 8
+
+('B6_LAX_JFK', 'B6', 'LAX', 'JFK',
+'2020-01-01 00:30:00+00', 2),  -- CSV Row 13
+
+('AS_PHX_ANC', 'AS', 'PHX', 'ANC',
+'2020-01-01 00:35:00+00', 2),  -- CSV Row 14
+
+('B6_PHX_FLL', 'B6', 'PHX', 'FLL',
+'2020-01-01 00:37:00+00', 2),  -- CSV Row 15
+
+('F9_SFO_DEN', 'F9', 'SFO', 'DEN',
+'2020-01-01 00:39:00+00', 2),  -- CSV Row 16
+
+('UA_SFO_EWR', 'UA', 'SFO', 'EWR',
+'2020-01-01 00:40:00+00', 2),  -- CSV Row 18
+
+('AS_SEA_ANC', 'AS', 'SEA', 'ANC',
+'2020-01-01 00:40:00+00', 2),  -- CSV Row 22
+
+('DL_LAX_MSP', 'DL', 'LAX', 'MSP',
+'2020-01-01 00:40:00+00', 2),  -- CSV Row 21
+
+('UA_LAX_ORD', 'UA', 'LAX', 'ORD',
+'2020-01-01 00:48:00+00', 2),  -- CSV Row 28
+
+('AA_PHX_PHL', 'AA', 'PHX', 'PHL',
+'2020-01-01 00:40:00+00', 2);  -- CSV Row 19
+
+-- ================================================
+-- STEP 8: INSERT 15 REAL FLIGHT OPERATIONS
+-- Source: Real AOBT and ATOT from BTS 2020 CSV
+-- AOBT and ATOT verified against CSV rows
+-- ================================================
+INSERT INTO flight_operation
+(flight_plan_id, aobt, atot, stand, runway, status)
+VALUES
+(1, '2020-01-01 00:05:00+00',
+'2020-01-01 00:19:00+00',
+'A1', '25R', 'DEPARTED'),  -- delay=0
+
+(2, '2020-01-01 00:03:00+00',
+'2020-01-01 00:15:00+00',
+'B1', '35R', 'DEPARTED'),  -- delay=0
+
+(3, '2020-01-01 00:13:00+00',
+'2020-01-01 00:29:00+00',
+'C1', '24R', 'DEPARTED'),  -- delay=0
+
+(4, '2020-01-01 00:29:00+00',
+'2020-01-01 00:40:00+00',
+'A2', '25R', 'DELAYED'),   -- delay=9 mins
+
+(5, '2020-01-01 00:34:00+00',
+'2020-01-01 00:47:00+00',
+'A3', '25L', 'DELAYED'),   -- delay=11 mins
+
+(6, '2020-01-01 00:27:00+00',
+'2020-01-01 00:38:00+00',
+'B2', '35L', 'DEPARTED'),  -- delay=0
+
+(7, '2020-01-01 00:22:00+00',
+'2020-01-01 00:36:00+00',
+'C2', '24L', 'DEPARTED'),  -- delay=0
+
+(8, '2020-01-01 00:24:00+00',
+'2020-01-01 00:42:00+00',
+'A4', '25R', 'DEPARTED'),  -- delay=0
+
+(9, '2020-01-01 00:28:00+00',
+'2020-01-01 00:38:00+00',
+'A5', '25L', 'DEPARTED'),  -- delay=0
+
+(10, '2020-01-01 00:29:00+00',
+'2020-01-01 00:41:00+00',
+'D1', '28R', 'DEPARTED'),  -- delay=0
+
+(11, '2020-01-01 00:37:00+00',
+'2020-01-01 00:52:00+00',
+'D2', '28L', 'DEPARTED'),  -- delay=0
+
+(12, '2020-01-01 00:36:00+00',
+'2020-01-01 00:50:00+00',
+'E1', '16R', 'DEPARTED'),  -- delay=0
+
+(13, '2020-01-01 00:29:00+00',
+'2020-01-01 00:54:00+00',
+'C3', '24R', 'DEPARTED'),  -- delay=0
+
+(14, '2020-01-01 00:40:00+00',
+'2020-01-01 00:52:00+00',
+'C4', '24L', 'DEPARTED'),  -- delay=0
+
+(15, '2020-01-01 00:36:00+00',
+'2020-01-01 00:49:00+00',
+'A6', '25R', 'DEPARTED');  -- delay=0
+
+-- ================================================
+-- STEP 9: VERIFICATION JOIN QUERY
+-- Connects all 4 tables together
+-- Shows complete flight information
+-- ================================================
+-- Complete verification query
+-- Shows both codes AND full names
+SELECT
+    fp.flight_plan_id,
+    fp.flight_no,
+    fp.airline_code,
+    am.airline_name,
+    fp.origin,
+    ap1.airport_name AS origin_airport,
+    fp.destination,
+    ap2.airport_name AS destination_airport,
+    fp.sobt,
+    fo.aobt,
+    fo.atot,
+    fo.stand,
+    fo.runway,
+    fo.status
+FROM flight_plan fp
+JOIN flight_operation fo
+    ON fp.flight_plan_id = fo.flight_plan_id
+JOIN airline_master am
+    ON fp.airline_code = am.airline_code
+JOIN airport_master ap1
+    ON fp.origin = ap1.airport_code
+JOIN airport_master ap2
+    ON fp.destination = ap2.airport_code
+ORDER BY fp.flight_plan_id;

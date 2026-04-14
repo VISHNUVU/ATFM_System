@@ -1,0 +1,521 @@
+{% extends 'base.html' %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+{# ── Page Header ── #}
+<div class="page-header">
+    <h2>
+        <i class="fa-solid fa-gauge" style="color:var(--blue);margin-right:10px;font-size:19px;" aria-hidden="true"></i>
+        Dashboard
+    </h2>
+    <p>
+        Welcome back, <strong style="color:var(--text-primary);">{{ username }}</strong>
+        &mdash; operational summary &middot;
+        <span style="font-family:'IBM Plex Mono',monospace;color:var(--amber);font-size:12px;">{{ today_date }}</span>
+    </p>
+</div>
+
+{# ── Filter Bar ── #}
+<form method="GET" action="/dashboard" id="filterForm" role="search" aria-label="Dashboard filters">
+<div class="filter-bar">
+
+    {% if role != 'airline_operator' %}
+    <div class="filter-group">
+        <label class="filter-label" for="airline_filter">
+            <i class="fa-solid fa-plane-departure" style="margin-right:4px;" aria-hidden="true"></i>Airline
+        </label>
+        <select name="airline_filter" id="airline_filter" class="filter-select"
+                onchange="document.getElementById('filterForm').submit()"
+                aria-label="Filter by airline">
+            <option value="">All Airlines</option>
+            {% for a in airlines_list %}
+            <option value="{{ a.airline_code }}" {{ 'selected' if airline_filter == a.airline_code }}>
+                {{ a.airline_code }} — {{ a.airline_name }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+
+    <div class="filter-group">
+        <label class="filter-label" for="status_filter">
+            <i class="fa-solid fa-tag" style="margin-right:4px;" aria-hidden="true"></i>Status
+        </label>
+        <select name="status_filter" id="status_filter" class="filter-select"
+                onchange="document.getElementById('filterForm').submit()"
+                aria-label="Filter by status">
+            <option value="">All Statuses</option>
+            <option value="PLANNED"   {{ 'selected' if status_filter == 'PLANNED' }}>Planned</option>
+            <option value="DEPARTED"  {{ 'selected' if status_filter == 'DEPARTED' }}>Departed</option>
+            <option value="DELAYED"   {{ 'selected' if status_filter == 'DELAYED' }}>Delayed</option>
+            <option value="CANCELLED" {{ 'selected' if status_filter == 'CANCELLED' }}>Cancelled</option>
+        </select>
+    </div>
+
+    {% if airline_filter or status_filter %}
+    <div class="filter-active-pills" aria-label="Active filters">
+        {% if airline_filter %}
+        <span class="filter-pill">
+            <i class="fa-solid fa-plane-departure" style="margin-right:4px;font-size:10px;" aria-hidden="true"></i>
+            {{ airline_filter }}
+        </span>
+        {% endif %}
+        {% if status_filter %}
+        <span class="filter-pill">
+            <i class="fa-solid fa-tag" style="margin-right:4px;font-size:10px;" aria-hidden="true"></i>
+            {{ status_filter | title }}
+        </span>
+        {% endif %}
+    </div>
+    <a href="/dashboard" class="filter-clear" aria-label="Clear all filters">
+        <i class="fa-solid fa-xmark" style="margin-right:4px;" aria-hidden="true"></i>Clear
+    </a>
+    {% endif %}
+
+</div>
+</form>
+
+{# ═══════════════════════════════════════════════════════════
+   ROW 1 — 6 KPI Tiles (ISA-101 instrument panel style)
+   ═══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4" role="region" aria-label="Key performance indicators">
+
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="stat-card stat-total">
+            <div class="stat-meta">
+                <span class="stat-label">Total</span>
+                <span class="stat-icon-wrap"><i class="fa-solid fa-plane-departure" aria-hidden="true"></i></span>
+            </div>
+            <div class="stat-value">{{ total_flights }}</div>
+            <div class="stat-sub">Flights today</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="stat-card stat-departed">
+            <div class="stat-meta">
+                <span class="stat-label">Departed</span>
+                <span class="stat-icon-wrap"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+            </div>
+            <div class="stat-value">{{ departed }}</div>
+            <div class="stat-sub">Airborne / on-block</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="stat-card stat-planned">
+            <div class="stat-meta">
+                <span class="stat-label">Planned</span>
+                <span class="stat-icon-wrap"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+            </div>
+            <div class="stat-value">{{ planned }}</div>
+            <div class="stat-sub">Pending departure</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="stat-card stat-delayed">
+            <div class="stat-meta">
+                <span class="stat-label">Delayed</span>
+                <span class="stat-icon-wrap"><i class="fa-solid fa-clock" aria-hidden="true"></i></span>
+            </div>
+            <div class="stat-value">{{ delayed }}</div>
+            <div class="stat-sub">Caution — monitor</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="stat-card stat-cancelled">
+            <div class="stat-meta">
+                <span class="stat-label">Cancelled</span>
+                <span class="stat-icon-wrap"><i class="fa-solid fa-ban" aria-hidden="true"></i></span>
+            </div>
+            <div class="stat-value">{{ cancelled }}</div>
+            <div class="stat-sub">Operations terminated</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="stat-card stat-otp">
+            <div class="stat-meta">
+                <span class="stat-label">OTP</span>
+                <span class="stat-icon-wrap"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span>
+            </div>
+            <div class="stat-value" id="otpTileValue"
+                 style="color:{{ otp_color }};">
+                {% if otp is not none %}{{ otp }}%{% else %}—{% endif %}
+            </div>
+            <div class="stat-sub">On-time performance</div>
+        </div>
+    </div>
+
+</div>
+
+{# ═══════════════════════════════════════════════════════════
+   ROW 2 — Hourly Departures (primary ops chart) + OTP Gauge
+   ═══════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-3">
+
+    {# ── Hourly Departures Timeline ── #}
+    <div class="col-lg-8">
+        <div class="atfm-card h-100">
+            <div class="atfm-card-header">
+                <span class="card-title-text">
+                    <span class="card-dot" aria-hidden="true"></span>
+                    Hourly Departure Demand
+                </span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);">
+                        <span style="display:inline-block;width:18px;height:2px;background:var(--amber);border-radius:2px;"></span>
+                        Capacity threshold
+                    </span>
+                    <span class="card-badge">UTC Hours</span>
+                </div>
+            </div>
+            <div style="padding:16px 20px 14px;">
+                <canvas id="hourlyChart" height="185"
+                        role="img" aria-label="Bar chart showing flight departures by UTC hour with capacity threshold line"></canvas>
+            </div>
+            <div class="atfm-card-footer">
+                <i class="fa-solid fa-circle-info" style="margin-right:5px;" aria-hidden="true"></i>
+                Demand profile for {{ today_date }} &middot; amber line = declared capacity ceiling
+            </div>
+        </div>
+    </div>
+
+    {# ── OTP Gauge ── #}
+    <div class="col-lg-4">
+        <div class="atfm-card h-100">
+            <div class="atfm-card-header">
+                <span class="card-title-text">
+                    <span class="card-dot"
+                          style="background:{{ otp_color }};box-shadow:0 0 6px {{ otp_color }}66;"
+                          aria-hidden="true"></span>
+                    On-Time Performance
+                </span>
+                <span class="card-badge">OTP%</span>
+            </div>
+
+            <div class="otp-gauge-wrap">
+                <canvas id="otpGauge" height="160"
+                        role="img"
+                        aria-label="OTP gauge: {{ otp if otp is not none else 'no data' }}%"></canvas>
+                <div class="otp-center-label">
+                    <span class="otp-pct" id="otpGaugeValue" style="color:{{ otp_color }};">
+                        {% if otp is not none %}{{ otp }}%{% else %}—{% endif %}
+                    </span>
+                    <span class="otp-label">On-Time</span>
+                </div>
+            </div>
+
+            <div class="otp-bands">
+                <div class="otp-band otp-green">
+                    <span class="otp-band-label">Good</span>
+                    <span class="otp-band-range">≥ 85%</span>
+                </div>
+                <div class="otp-band otp-amber">
+                    <span class="otp-band-label">Caution</span>
+                    <span class="otp-band-range">70–84%</span>
+                </div>
+                <div class="otp-band otp-red">
+                    <span class="otp-band-label">Warning</span>
+                    <span class="otp-band-range">&lt; 70%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ═══════════════════════════════════════════════════════════
+   ROW 3 — Airline Breakdown + Status Distribution
+   ═══════════════════════════════════════════════════════════ #}
+<div class="row g-3">
+
+    <div class="col-lg-7">
+        <div class="atfm-card h-100">
+            <div class="atfm-card-header">
+                <span class="card-title-text">
+                    <span class="card-dot" aria-hidden="true"></span>
+                    Flights by Airline
+                </span>
+                <span class="card-badge">Bar</span>
+            </div>
+            <div style="padding:16px 20px;">
+                <canvas id="airlineChart" height="195"
+                        role="img" aria-label="Bar chart showing flight counts by airline"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="atfm-card h-100">
+            <div class="atfm-card-header">
+                <span class="card-title-text">
+                    <span class="card-dot"
+                          style="background:var(--green);box-shadow:0 0 6px rgba(30,184,122,0.5);"
+                          aria-hidden="true"></span>
+                    Status Distribution
+                </span>
+                <span class="card-badge">Doughnut</span>
+            </div>
+            <div style="padding:16px 20px;display:flex;align-items:center;justify-content:center;">
+                <canvas id="statusChart" height="195" style="max-width:260px;"
+                        role="img" aria-label="Doughnut chart showing distribution of flight statuses"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ══════════════════════════════════════════════════════════
+   Global Chart.js dark-theme defaults
+   ══════════════════════════════════════════════════════════ */
+Chart.defaults.color       = '#8899aa';
+Chart.defaults.borderColor = '#252f3f';
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size   = 12;
+
+/* ══════════════════════════════════════════════════════════
+   CHART 1 — Hourly Departure Demand (bar + threshold line)
+   Primary ATFM operational view — demand vs capacity
+   ══════════════════════════════════════════════════════════ */
+(function () {
+    const hourLabels   = {{ hour_labels | tojson }};
+    const hourlyCounts = {{ hourly_counts | tojson }};
+    const capacity     = {{ capacity_threshold }};
+
+    new Chart(document.getElementById('hourlyChart'), {
+        type: 'bar',
+        data: {
+            labels: hourLabels,
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Departures',
+                    data: hourlyCounts,
+                    backgroundColor: hourlyCounts.map(v =>
+                        v > capacity
+                            ? 'rgba(230,57,70,0.70)'
+                            : v > capacity * 0.8
+                                ? 'rgba(245,166,35,0.70)'
+                                : 'rgba(10,132,255,0.65)'
+                    ),
+                    borderColor: hourlyCounts.map(v =>
+                        v > capacity
+                            ? 'rgba(230,57,70,0.9)'
+                            : v > capacity * 0.8
+                                ? 'rgba(245,166,35,0.9)'
+                                : 'rgba(10,132,255,0.9)'
+                    ),
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false,
+                    order: 2,
+                },
+                {
+                    type: 'line',
+                    label: 'Capacity',
+                    data: Array(24).fill(capacity),
+                    borderColor: '#f5a623',
+                    borderWidth: 1.5,
+                    borderDash: [6, 4],
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    order: 1,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#111827',
+                    titleColor: '#e6eaf2',
+                    bodyColor: '#8899aa',
+                    borderColor: '#252f3f',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        title: ctx => ctx[0].label + ':00 UTC',
+                        label: ctx => ctx.dataset.label === 'Capacity'
+                            ? ' Capacity ceiling: ' + ctx.parsed.y
+                            : ' Departures: ' + ctx.parsed.y,
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: '#4a6080',
+                        font: { size: 10, family: "'IBM Plex Mono', monospace" },
+                        maxRotation: 0,
+                    },
+                    border: { color: '#252f3f' }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#1a2235' },
+                    ticks: { color: '#4a6080', stepSize: 1, font: { size: 10 } },
+                    border: { color: '#252f3f', dash: [4, 4] }
+                }
+            }
+        }
+    });
+})();
+
+/* ══════════════════════════════════════════════════════════
+   CHART 2 — OTP Semi-Circular Gauge (half-doughnut)
+   Industry-standard KPI view for on-time performance
+   ══════════════════════════════════════════════════════════ */
+(function () {
+    const otp      = {{ otp if otp is not none else 'null' }};
+    const otpColor = '{{ otp_color }}';
+    const pct      = (otp !== null) ? otp : 0;
+    const rem      = 100 - pct;
+
+    new Chart(document.getElementById('otpGauge'), {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [pct, rem],
+                backgroundColor: [otpColor, '#1a2235'],
+                borderWidth: 0,
+                hoverBackgroundColor: [otpColor, '#1a2235'],
+            }]
+        },
+        options: {
+            circumference: 180,
+            rotation: -90,
+            cutout: '78%',
+            responsive: true,
+            animation: {
+                duration: 900,
+                easing: 'easeOutQuart',
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false },
+            }
+        }
+    });
+})();
+
+/* ══════════════════════════════════════════════════════════
+   CHART 3 — Flights by Airline (bar)
+   ══════════════════════════════════════════════════════════ */
+new Chart(document.getElementById('airlineChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ airline_labels | tojson }},
+        datasets: [{
+            label: 'Flights',
+            data: {{ airline_counts | tojson }},
+            backgroundColor: [
+                'rgba(10,132,255,0.70)', 'rgba(10,132,255,0.58)',
+                'rgba(10,132,255,0.48)', 'rgba(74,158,255,0.65)',
+                'rgba(74,158,255,0.52)', 'rgba(30,184,122,0.60)',
+                'rgba(245,166,35,0.60)', 'rgba(230,57,70,0.55)',
+                'rgba(10,132,255,0.40)',
+            ],
+            borderColor: 'transparent',
+            borderRadius: 5,
+            borderSkipped: false,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: '#111827',
+                titleColor: '#e6eaf2',
+                bodyColor: '#8899aa',
+                borderColor: '#252f3f',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8,
+            }
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: { color: '#4a6080', font: { size: 11 } },
+                border: { color: '#252f3f' }
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: '#1a2235' },
+                ticks: { color: '#4a6080', stepSize: 1, font: { size: 11 } },
+                border: { color: '#252f3f', dash: [4, 4] }
+            }
+        }
+    }
+});
+
+/* ══════════════════════════════════════════════════════════
+   CHART 4 — Status Distribution (doughnut)
+   ICAO/FAA standard status colour coding
+   ══════════════════════════════════════════════════════════ */
+(function () {
+    const STATUS_COLORS = {
+        'DEPARTED':  '#1eb87a',
+        'DELAYED':   '#f5a623',
+        'CANCELLED': '#e63946',
+        'PLANNED':   '#4a9eff',
+    };
+    const sLabels = {{ status_labels | tojson }};
+    const sBg     = sLabels.map(l => STATUS_COLORS[l] || '#4a6080');
+
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: sLabels,
+            datasets: [{
+                data: {{ status_counts | tojson }},
+                backgroundColor: sBg,
+                borderColor: '#161c27',
+                borderWidth: 3,
+                hoverOffset: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '68%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 14,
+                        usePointStyle: true,
+                        pointStyleWidth: 8,
+                        color: '#8899aa',
+                        font: { size: 12, weight: '600' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#111827',
+                    titleColor: '#e6eaf2',
+                    bodyColor: '#8899aa',
+                    borderColor: '#252f3f',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

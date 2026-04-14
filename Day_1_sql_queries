@@ -1,0 +1,145 @@
+-- ================================================
+-- ATFM PROJECT - DAY 1 SQL QUERIES
+-- Date: 07 April 2026
+-- Goal: Create database and all tables
+-- ================================================
+
+-- ------------------------------------------------
+-- WHAT WE DID IN DAY 1:
+-- Step 1: Opened pgAdmin 4
+-- Step 2: Created new database called atfm_db
+--         (Right click Databases → Create → Database
+--          → typed atfm_db → clicked Save)
+-- Step 3: Opened Query Tool
+--         (clicked atfm_db → Tools → Query Tool)
+-- Step 4: Ran SQL code below to create 7 tables
+-- Step 5: Verified tables using \dt in SQL Shell
+--         (showed 7 rows - all tables confirmed)
+-- ------------------------------------------------
+
+-- ================================================
+-- TABLE 1: app_user
+-- Purpose: Stores all users who can login
+-- Columns: user_id, username, email, password,
+--          full_name, is_active, last_login,
+--          created_at
+-- ================================================
+CREATE TABLE app_user (
+    user_id         SERIAL PRIMARY KEY,
+    username        VARCHAR(50) NOT NULL UNIQUE,
+    email           VARCHAR(255) NOT NULL UNIQUE,
+    password_hash   TEXT NOT NULL,
+    full_name       VARCHAR(100),
+    is_active       BOOLEAN DEFAULT true,
+    last_login      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- ================================================
+-- TABLE 2: role
+-- Purpose: Stores all job titles/roles
+-- Example: system_admin, atc_controller etc.
+-- ================================================
+CREATE TABLE role (
+    role_id         SERIAL PRIMARY KEY,
+    role_name       VARCHAR(50) NOT NULL UNIQUE,
+    description     TEXT
+);
+
+-- ================================================
+-- TABLE 3: permission
+-- Purpose: Stores what actions are allowed
+-- Example: flight_plan-create, stand-read etc.
+-- ================================================
+CREATE TABLE permission (
+    permission_id   SERIAL PRIMARY KEY,
+    resource        VARCHAR(100) NOT NULL,
+    action          VARCHAR(50) NOT NULL,
+    UNIQUE(resource, action)
+);
+
+-- ================================================
+-- TABLE 4: user_role
+-- Purpose: Bridge table - connects users to roles
+-- Example: admin1 → system_admin
+-- ================================================
+CREATE TABLE user_role (
+    user_id         INT REFERENCES app_user(user_id)
+                    ON DELETE CASCADE,
+    role_id         INT REFERENCES role(role_id)
+                    ON DELETE CASCADE,
+    assigned_at     TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (user_id, role_id)
+);
+
+-- ================================================
+-- TABLE 5: role_permission
+-- Purpose: Bridge table - connects roles to
+--          permissions
+-- Example: system_admin → can create flights
+-- ================================================
+CREATE TABLE role_permission (
+    role_id         INT REFERENCES role(role_id)
+                    ON DELETE CASCADE,
+    permission_id   INT REFERENCES
+                    permission(permission_id)
+                    ON DELETE CASCADE,
+    granted_at      TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- ================================================
+-- TABLE 6: user_login_history
+-- Purpose: Records every login attempt
+-- Example: who logged in, when, from where,
+--          success or fail
+-- ================================================
+CREATE TABLE user_login_history (
+    login_id        SERIAL PRIMARY KEY,
+    user_id         INT REFERENCES
+                    app_user(user_id),
+    login_time      TIMESTAMPTZ DEFAULT now(),
+    ip_address      INET,
+    success         BOOLEAN NOT NULL
+);
+
+-- ================================================
+-- TABLE 7: audit_log
+-- Purpose: Records every change made in system
+-- Example: who changed what, when, which table
+-- ================================================
+CREATE TABLE audit_log (
+    audit_id        SERIAL PRIMARY KEY,
+    table_name      VARCHAR(100),
+    record_id       INT,
+    action          VARCHAR(20),
+    changed_by      INT REFERENCES
+                    app_user(user_id),
+    changed_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- ================================================
+-- VERIFY ALL 7 TABLES CREATED
+-- Run these one by one to check each table
+-- ================================================
+
+-- 1. Check roles table
+SELECT * FROM role;
+
+-- 2. Check permissions table
+SELECT * FROM permission;
+
+-- 3. Check users table
+SELECT * FROM app_user;
+
+-- 4. Check user-role mapping table
+SELECT * FROM user_role;
+
+-- 5. Check role-permission mapping table
+SELECT * FROM role_permission;
+
+-- 6. Check login history table
+SELECT * FROM user_login_history;
+
+-- 7. Check audit log table
+SELECT * FROM audit_log;

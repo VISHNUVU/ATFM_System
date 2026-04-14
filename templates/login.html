@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="login-page">
+    <div class="login-card">
+
+        <div class="login-logo">
+            <span class="logo-icon">✈️</span>
+            <div class="logo-name">ATFM System</div>
+            <div class="logo-sub">Air Traffic Flow Management</div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible mb-4"
+                     style="border-radius:12px; font-size:13px; font-weight:500;">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/login">
+
+            <div style="margin-bottom:18px;">
+                <label class="f-label">
+                    <i class="fa-solid fa-user" style="margin-right:6px;color:#475569;"></i>
+                    Username
+                </label>
+                <input type="text"
+                       name="username"
+                       class="f-input"
+                       placeholder="Enter your username"
+                       autocomplete="username"
+                       required>
+            </div>
+
+            <div style="margin-bottom:28px;">
+                <label class="f-label">
+                    <i class="fa-solid fa-lock" style="margin-right:6px;color:#475569;"></i>
+                    Password
+                </label>
+                <input type="password"
+                       name="password"
+                       class="f-input"
+                       placeholder="Enter your password"
+                       autocomplete="current-password"
+                       required>
+            </div>
+
+            <button type="submit" class="login-submit">
+                <i class="fa-solid fa-right-to-bracket" style="margin-right:8px;"></i>
+                Sign In
+            </button>
+
+        </form>
+
+        <div class="login-foot">
+            <i class="fa-solid fa-shield-halved" style="margin-right:5px;"></i>
+            Secure system &mdash; authorised users only
+        </div>
+
+    </div>
+</div>
+{% endblock %}

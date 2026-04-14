@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% block page_title %}Map View{% endblock %}
+
+{# Load Leaflet CSS in <head> via the head_extra block #}
+{% block head_extra %}
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+<style>
+  .page-body { padding: 0 !important; overflow: hidden !important; }
+  body        { overflow: hidden !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ═══════════════════════════════════════════════════════════
+   Full-screen map container — cancels page-body padding
+   ═══════════════════════════════════════════════════════════ #}
+<div class="map-fullscreen" role="region" aria-label="ATFM flight route map">
+
+    {# ── Leaflet map canvas ── #}
+    <div id="atfm-map" aria-label="Interactive map showing flight routes"></div>
+
+    {# ── TOP-LEFT: Branding + live stats ── #}
+    <div class="map-panel map-stats-panel" role="complementary" aria-label="Map statistics">
+        <div class="map-brand">
+            <i class="fa-solid fa-plane-departure" aria-hidden="true"></i>
+            ATFM Map View
+        </div>
+        <div class="map-stat-row">
+            <span class="map-stat-dot" style="background:#0a84ff;" aria-hidden="true"></span>
+            <span>{{ total_routes }} routes displayed</span>
+        </div>
+        {% for status, cnt in status_counts.items() %}
+        {% set dot_colors = {'DEPARTED':'#1eb87a','DELAYED':'#f5a623','CANCELLED':'#e63946','PLANNED':'#4a9eff'} %}
+        <div class="map-stat-row">
+            <span class="map-stat-dot"
+                  style="background:{{ dot_colors.get(status, '#4a6080') }};"
+                  aria-hidden="true"></span>
+            <span>{{ status | title }}: {{ cnt }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    {# ── TOP-RIGHT: Layer toggle panel ── #}
+    <div class="map-panel map-layers-panel" role="complementary" aria-label="Layer controls">
+        <div class="map-panel-title">
+            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+            Route Layers
+        </div>
+
+        <label class="layer-row" for="toggle-PLANNED">
+            <span class="layer-check">
+                <span class="layer-dot" style="background:#4a9eff;" aria-hidden="true"></span>
+                Planned
+            </span>
+            <span class="layer-count" id="cnt-PLANNED">{{ status_counts.get('PLANNED', 0) }}</span>
+            <input type="checkbox" class="layer-toggle" id="toggle-PLANNED"
+                   data-status="PLANNED" checked aria-label="Toggle planned routes">
+        </label>
+
+        <label class="layer-row" for="toggle-DEPARTED">
+            <span class="layer-check">
+                <span class="layer-dot" style="background:#1eb87a;" aria-hidden="true"></span>
+                Departed
+            </span>
+            <span class="layer-count" id="cnt-DEPARTED">{{ status_counts.get('DEPARTED', 0) }}</span>
+            <input type="checkbox" class="layer-toggle" id="toggle-DEPARTED"
+                   data-status="DEPARTED" checked aria-label="Toggle departed routes">
+        </label>
+
+        <label class="layer-row" for="toggle-DELAYED">
+            <span class="layer-check">
+                <span class="layer-dot" style="background:#f5a623;" aria-hidden="true"></span>
+                Delayed
+            </span>
+            <span class="layer-count" id="cnt-DELAYED">{{ status_counts.get('DELAYED', 0) }}</span>
+            <input type="checkbox" class="layer-toggle" id="toggle-DELAYED"
+                   data-status="DELAYED" checked aria-label="Toggle delayed routes">
+        </label>
+
+        <label class="layer-row" for="toggle-CANCELLED">
+            <span class="layer-check">
+                <span class="layer-dot" style="background:#e63946;" aria-hidden="true"></span>
+                Cancelled
+            </span>
+            <span class="layer-count" id="cnt-CANCELLED">{{ status_counts.get('CANCELLED', 0) }}</span>
+            <input type="checkbox" class="layer-toggle" id="toggle-CANCELLED"
+                   data-status="CANCELLED" checked aria-label="Toggle cancelled routes">
+        </label>
+
+        <label class="layer-row" for="toggle-airports">
+            <span class="layer-check">
+                <span class="layer-dot" style="background:#0a84ff;box-shadow:0 0 5px #0a84ff88;" aria-hidden="true"></span>
+                Airports
+            </span>
+            <span class="layer-count">{{ airports | length }}</span>
+            <input type="checkbox" class="layer-toggle" id="toggle-airports"
+                   data-status="airports" checked aria-label="Toggle airport markers">
+        </label>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+
+<script>
+/* ── data from Flask ── */
+const AIRPORTS = {{ airports | tojson }};
+const ROUTES   = {{ routes   | tojson }};
+
+window.addEventListener('load', function () {
+'use strict';
+
+/* ════════════════════════════════════════════════════
+   FIT MAP HEIGHT — measures actual top of #atfm-map
+   so any banner/topbar combo is handled automatically.
+   ════════════════════════════════════════════════════ */
+function fitMapHeight() {
+    var el = document.getElementById('atfm-map');
+    if (!el) return;
+    var top = el.getBoundingClientRect().top;
+    var h   = Math.max(200, window.innerHeight - top);
+    el.parentElement.style.height = h + 'px';
+    el.style.height = h + 'px';
+}
+fitMapHeight();
+
+/* ════════════════════════════════════════════════════
+   PALETTE — ICAO/FAA status colours
+   ════════════════════════════════════════════════════ */
+const STATUS_COLOR = {
+    PLANNED:   '#4a9eff',
+    DEPARTED:  '#1eb87a',
+    DELAYED:   '#f5a623',
+    CANCELLED: '#e63946',
+};
+const STATUS_WEIGHT = {
+    PLANNED:   1.5,
+    DEPARTED:  2.0,
+    DELAYED:   2.5,
+    CANCELLED: 2.0,
+};
+const STATUS_OPACITY = {
+    PLANNED:   0.55,
+    DEPARTED:  0.80,
+    DELAYED:   0.90,
+    CANCELLED: 0.75,
+};
+
+/* ════════════════════════════════════════════════════
+   INIT MAP — tile layer switches with day/night theme
+   ════════════════════════════════════════════════════ */
+const TILES = {
+    dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+};
+const TILE_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>';
+
+const isDark = () => document.documentElement.getAttribute('data-theme') !== 'light';
+
+const map = L.map('atfm-map', {
+    center: [38.5, -97],
+    zoom: 4,
+    zoomControl: false,
+    attributionControl: true,
+});
+
+var tileLayer = L.tileLayer(isDark() ? TILES.dark : TILES.light,
+    { attribution: TILE_ATTR, subdomains: 'abcd', maxZoom: 19 }
+).addTo(map);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Swap tiles when theme toggles
+document.addEventListener('themechange', function () {
+    tileLayer.setUrl(isDark() ? TILES.dark : TILES.light);
+});
+
+/* ════════════════════════════════════════════════════
+   LAYER GROUPS — one per status + airports
+   ════════════════════════════════════════════════════ */
+const layers = {
+    PLANNED:   L.layerGroup().addTo(map),
+    DEPARTED:  L.layerGroup().addTo(map),
+    DELAYED:   L.layerGroup().addTo(map),
+    CANCELLED: L.layerGroup().addTo(map),
+    airports:  L.layerGroup().addTo(map),
+};
+
+/* ════════════════════════════════════════════════════
+   HELPER — curved arc between two lat/lon points
+   Uses a mid-point offset to simulate a great-circle
+   visual effect on the Mercator projection.
+   ════════════════════════════════════════════════════ */
+function arcPoints(lat1, lon1, lat2, lon2, steps) {
+    steps = steps || 30;
+    const pts = [];
+    const dLat = lat2 - lat1;
+    const dLon = lon2 - lon1;
+    const dist = Math.sqrt(dLat * dLat + dLon * dLon);
+    // Arc height proportional to route distance
+    const lift = dist * 0.08;
+
+    for (let i = 0; i <= steps; i++) {
+        const t   = i / steps;
+        const lat = lat1 + dLat * t;
+        const lon = lon1 + dLon * t;
+        // Parabolic vertical offset
+        const offset = lift * 4 * t * (1 - t);
+        pts.push([lat + offset, lon]);
+    }
+    return pts;
+}
+
+/* ════════════════════════════════════════════════════
+   HELPER — popup HTML for a route
+   ════════════════════════════════════════════════════ */
+function routePopup(rt) {
+    const color  = STATUS_COLOR[rt.status] || '#4a6080';
+    const status = rt.status || '—';
+    const delay  = (rt.delay !== null && rt.delay !== undefined)
+        ? (rt.delay <= 0 ? '<span style="color:#1eb87a;">On time</span>'
+          : rt.delay <= 15 ? '<span style="color:#1eb87a;">+' + rt.delay + 'm</span>'
+          : rt.delay <= 60 ? '<span style="color:#f5a623;">+' + rt.delay + 'm</span>'
+          : '<span style="color:#e63946;">+' + rt.delay + 'm</span>')
+        : '—';
+
+    return '<div class="map-popup">' +
+        '<div class="map-popup-callsign">' +
+            '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;' +
+            'background:' + color + ';margin-right:4px;flex-shrink:0;' +
+            'box-shadow:0 0 6px ' + color + '88;"></span>' +
+            rt.callsign +
+        '</div>' +
+        '<div class="map-popup-row"><span>Route</span>' +
+            '<span class="map-popup-val">' + rt.origin + ' → ' + rt.dest + '</span></div>' +
+        '<div class="map-popup-row"><span>Airline</span>' +
+            '<span class="map-popup-val">' + rt.airline + '</span></div>' +
+        '<div class="map-popup-row"><span>SOBT</span>' +
+            '<span class="map-popup-val">' + rt.sobt + ' UTC</span></div>' +
+        '<div class="map-popup-row"><span>Status</span>' +
+            '<span class="map-popup-val" style="color:' + color + ';">' + status + '</span></div>' +
+        '<div class="map-popup-row"><span>Delay</span>' +
+            '<span class="map-popup-val">' + delay + '</span></div>' +
+        '</div>';
+}
+
+/* ════════════════════════════════════════════════════
+   DRAW ROUTES
+   ════════════════════════════════════════════════════ */
+ROUTES.forEach(function (rt) {
+    const status = rt.status || 'PLANNED';
+    const color  = STATUS_COLOR[status]   || '#4a6080';
+    const weight = STATUS_WEIGHT[status]  || 1.5;
+    const opac   = STATUS_OPACITY[status] || 0.6;
+    const layer  = layers[status] || layers.PLANNED;
+
+    const pts = arcPoints(
+        rt.orig_lat, rt.orig_lon,
+        rt.dest_lat, rt.dest_lon
+    );
+
+    // Glow effect: thicker transparent line underneath
+    L.polyline(pts, {
+        color:   color,
+        weight:  weight + 3,
+        opacity: opac * 0.25,
+        smoothFactor: 1,
+    }).addTo(layer);
+
+    // Main route line
+    const line = L.polyline(pts, {
+        color:   color,
+        weight:  weight,
+        opacity: opac,
+        smoothFactor: 1,
+    }).addTo(layer);
+
+    // Direction arrow at midpoint
+    const midIdx = Math.floor(pts.length / 2);
+    if (pts.length > 2) {
+        const p1 = pts[midIdx - 1];
+        const p2 = pts[midIdx + 1];
+        const bearing = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
+        const arrowIcon = L.divIcon({
+            className: '',
+            html: '<div style="color:' + color + ';opacity:' + (opac + 0.1) + ';' +
+                  'font-size:11px;transform:rotate(' + bearing + 'deg);' +
+                  'text-shadow:0 0 4px #000;">▶</div>',
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+        });
+        L.marker(pts[midIdx], { icon: arrowIcon, interactive: false }).addTo(layer);
+    }
+
+    line.bindPopup(routePopup(rt), {
+        maxWidth: 260,
+        className: 'atfm-popup',
+    });
+
+    // Highlight on hover
+    line.on('mouseover', function () {
+        this.setStyle({ weight: weight + 2, opacity: Math.min(opac + 0.2, 1) });
+    });
+    line.on('mouseout', function () {
+        this.setStyle({ weight: weight, opacity: opac });
+    });
+});
+
+/* ════════════════════════════════════════════════════
+   DRAW AIRPORT MARKERS
+   Radius scaled by operation count
+   ════════════════════════════════════════════════════ */
+const maxOps = Math.max.apply(null, AIRPORTS.map(function (a) { return a.ops; })) || 1;
+
+AIRPORTS.forEach(function (ap) {
+    const radius = 4 + Math.round((ap.ops / maxOps) * 10);
+    const marker = L.circleMarker([ap.lat, ap.lon], {
+        radius:      radius,
+        color:       '#0a84ff',
+        fillColor:   '#0a84ff',
+        fillOpacity: 0.75,
+        weight:      1.5,
+        opacity:     0.9,
+    }).addTo(layers.airports);
+
+    marker.bindTooltip(
+        '<strong>' + ap.code + '</strong><br>' +
+        '<span style="color:#8899aa;font-size:10px;">' + ap.name + '</span><br>' +
+        '<span style="color:#4a9eff;">' + ap.ops + ' operations</span>',
+        { permanent: false, direction: 'top', offset: [0, -radius] }
+    );
+});
+
+/* ════════════════════════════════════════════════════
+   FIT BOUNDS to all airports
+   ════════════════════════════════════════════════════ */
+if (AIRPORTS.length > 0) {
+    const bounds = L.latLngBounds(AIRPORTS.map(function (a) { return [a.lat, a.lon]; }));
+    map.fitBounds(bounds, { padding: [40, 40] });
+}
+
+/* ════════════════════════════════════════════════════
+   LAYER TOGGLE CONTROLS
+   ════════════════════════════════════════════════════ */
+document.querySelectorAll('.layer-toggle').forEach(function (chk) {
+    chk.addEventListener('change', function () {
+        const status = this.dataset.status;
+        const layer  = layers[status];
+        if (!layer) return;
+        if (this.checked) {
+            map.addLayer(layer);
+        } else {
+            map.removeLayer(layer);
+        }
+    });
+});
+
+/* ════════════════════════════════════════════════════
+   KEYBOARD: Reset view on 'R'
+   ════════════════════════════════════════════════════ */
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'r' || e.key === 'R') {
+        if (AIRPORTS.length > 0) {
+            const bounds = L.latLngBounds(AIRPORTS.map(function (a) { return [a.lat, a.lon]; }));
+            map.fitBounds(bounds, { padding: [40, 40] });
+        }
+    }
+});
+
+/* ════════════════════════════════════════════════════
+   RESIZE: refit map height when window is resized
+   ════════════════════════════════════════════════════ */
+window.addEventListener('resize', function () {
+    fitMapHeight();
+    map.invalidateSize();
+});
+
+}); // end window.load
+</script>
+{% endblock %}

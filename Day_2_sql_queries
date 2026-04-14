@@ -1,0 +1,195 @@
+-- ================================================
+-- ATFM PROJECT - DAY 2 SQL QUERIES
+-- Date: 07 April 2026
+-- Goal: Insert roles, permissions, users and
+--       assign them to each other
+-- ================================================
+
+-- ------------------------------------------------
+-- WHAT WE DID IN DAY 2:
+-- Step 1: Inserted 6 user roles
+-- Step 2: Inserted 10 permissions
+-- Step 3: Created 6 sample users
+-- Step 4: Assigned roles to users
+-- Step 5: Assigned permissions to roles
+-- Step 6: Ran test query to verify everything
+-- ------------------------------------------------
+
+-- ================================================
+-- STEP 1: INSERT 6 ROLES
+-- Purpose: Add job titles into role table
+-- These are the 6 types of users in our system
+-- ================================================
+INSERT INTO role (role_name, description) VALUES
+('system_admin', 'Full system control - can do everything'),
+('airline_operator', 'Manages own airline flights only'),
+('atc_controller', 'Controls departure and arrival slots'),
+('airport_ops', 'Manages stands and runways'),
+('ai_analyst', 'Trains and views AI predictions'),
+('observer', 'Read only access - cannot change anything');
+
+-- Verify roles inserted
+SELECT * FROM role;
+
+-- ================================================
+-- STEP 2: INSERT 10 PERMISSIONS
+-- Purpose: Define what actions are allowed
+--          on which resource in the system
+-- resource = what area (flight, stand, runway)
+-- action   = what they can do (read, create etc)
+-- ================================================
+INSERT INTO permission (resource, action) VALUES
+('flight_plan', 'create'),  -- can create flights
+('flight_plan', 'read'),    -- can view flights
+('flight_plan', 'update'),  -- can edit flights
+('stand', 'read'),          -- can view stands
+('stand', 'update'),        -- can edit stands
+('runway', 'read'),         -- can view runways
+('runway', 'update'),       -- can edit runways
+('ai_model', 'train'),      -- can train AI model
+('ai_model', 'view'),       -- can view AI results
+('user', 'manage');         -- can manage users
+
+-- Verify permissions inserted
+SELECT * FROM permission;
+
+-- ================================================
+-- STEP 3: CREATE 6 SAMPLE USERS
+-- Purpose: Create one login account for each
+--          role type in the system
+-- Note: passwords will be properly encrypted
+--       in Day 4 using bcrypt
+-- ================================================
+INSERT INTO app_user
+(username, email, password_hash, full_name, is_active)
+VALUES
+('admin1',
+ 'admin@atfm.com',
+ 'pass123',
+ 'System Admin',
+ true),
+
+('airline_ba',
+ 'ba@airline.com',
+ 'pass123',
+ 'British Airways Ops',
+ true),
+
+('atc_dxb',
+ 'atc@dxb.com',
+ 'pass123',
+ 'Dubai ATC Controller',
+ true),
+
+('airport_ops1',
+ 'ops@dxb.com',
+ 'pass123',
+ 'Airport Operations',
+ true),
+
+('ai_analyst1',
+ 'ai@atfm.com',
+ 'pass123',
+ 'AI Data Analyst',
+ true),
+
+('observer1',
+ 'obs@caa.com',
+ 'pass123',
+ 'CAA Regulator',
+ true);
+
+-- Verify users inserted
+SELECT * FROM app_user;
+
+-- ================================================
+-- STEP 4: ASSIGN ROLES TO USERS
+-- Purpose: Connect each user to their job role
+-- (user_id, role_id) means:
+-- user 1 (admin1)       → role 1 (system_admin)
+-- user 2 (airline_ba)   → role 2 (airline_operator)
+-- user 3 (atc_dxb)      → role 3 (atc_controller)
+-- user 4 (airport_ops1) → role 4 (airport_ops)
+-- user 5 (ai_analyst1)  → role 5 (ai_analyst)
+-- user 6 (observer1)    → role 6 (observer)
+-- ================================================
+INSERT INTO user_role (user_id, role_id) VALUES
+(1, 1),  -- admin1       → system_admin
+(2, 2),  -- airline_ba   → airline_operator
+(3, 3),  -- atc_dxb      → atc_controller
+(4, 4),  -- airport_ops1 → airport_ops
+(5, 5),  -- ai_analyst1  → ai_analyst
+(6, 6);  -- observer1    → observer
+
+-- Verify user-role assignments
+SELECT * FROM user_role;
+
+-- ================================================
+-- STEP 5: ASSIGN PERMISSIONS TO ROLES
+-- Purpose: Define what each role is allowed to do
+--
+-- system_admin   → ALL 10 permissions
+-- airline_operator → flight_plan only (1,2,3)
+-- atc_controller → runway only (6,7)
+-- airport_ops    → stand only (4,5)
+-- ai_analyst     → ai_model only (8,9)
+-- observer       → read only (2,4,6,9)
+-- ================================================
+INSERT INTO role_permission (role_id, permission_id)
+VALUES
+-- system_admin gets ALL permissions
+(1, 1),(1, 2),(1, 3),(1, 4),(1, 5),
+(1, 6),(1, 7),(1, 8),(1, 9),(1, 10),
+
+-- airline_operator: flight_plan only
+(2, 1),  -- create flight
+(2, 2),  -- read flight
+(2, 3),  -- update flight
+
+-- atc_controller: runway only
+(3, 6),  -- read runway
+(3, 7),  -- update runway
+
+-- airport_ops: stand only
+(4, 4),  -- read stand
+(4, 5),  -- update stand
+
+-- ai_analyst: ai_model only
+(5, 8),  -- train ai model
+(5, 9),  -- view ai model
+
+-- observer: read only permissions
+(6, 2),  -- read flight
+(6, 4),  -- read stand
+(6, 6),  -- read runway
+(6, 9);  -- view ai model
+
+-- Verify role-permission assignments
+SELECT * FROM role_permission;
+
+-- ================================================
+-- STEP 6: TEST QUERY - VERIFY EVERYTHING WORKS
+-- Purpose: Show each user with their role name
+--          by joining 3 tables together:
+--          app_user + user_role + role
+-- ================================================
+SELECT
+    u.username,
+    u.full_name,
+    r.role_name,
+    r.description
+FROM app_user u
+JOIN user_role ur ON u.user_id = ur.user_id
+JOIN role r ON ur.role_id = r.role_id
+ORDER BY u.user_id;
+
+-- ================================================
+-- EXPECTED FINAL RESULT:
+-- username     | full_name            | role_name
+-- admin1       | System Admin         | system_admin
+-- airline_ba   | British Airways Ops  | airline_operator
+-- atc_dxb      | Dubai ATC Controller | atc_controller
+-- airport_ops1 | Airport Operations   | airport_ops
+-- ai_analyst1  | AI Data Analyst      | ai_analyst
+-- observer1    | CAA Regulator        | observer
+-- ================================================

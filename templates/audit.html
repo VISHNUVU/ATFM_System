@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2>
+        <i class="fa-solid fa-shield-halved" style="color:var(--blue);margin-right:10px;font-size:20px;"></i>
+        Audit Log
+    </h2>
+    <p>Every INSERT and UPDATE on flight data — last 100 entries.</p>
+</div>
+
+<div class="atfm-card">
+
+    <div class="atfm-card-header">
+        <span class="card-title-text">
+            <span class="card-dot" style="background:var(--amber);box-shadow:0 0 6px rgba(245,166,35,0.5);"></span>
+            System Activity
+        </span>
+        <span style="font-size:12px;color:var(--text-secondary);">
+            <i class="fa-solid fa-clock-rotate-left" style="margin-right:4px;"></i>
+            {{ logs | length }} entries
+        </span>
+    </div>
+
+    <div class="atfm-table-wrap">
+        <table class="atfm-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Table</th>
+                    <th>Record ID</th>
+                    <th>Action</th>
+                    <th>Changed By</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in logs %}
+            <tr>
+                <td style="color:var(--text-secondary);font-size:12px;">{{ log.audit_id }}</td>
+
+                <td>
+                    <span class="tbl-badge">{{ log.table_name }}</span>
+                </td>
+
+                <td style="font-weight:600;color:var(--text-secondary);">{{ log.record_id }}</td>
+
+                <td>
+                    {% if log.action == 'INSERT' %}
+                        <span class="s-badge a-insert">
+                            <i class="fa-solid fa-plus" style="font-size:9px;"></i> INSERT
+                        </span>
+                    {% elif log.action == 'UPDATE' %}
+                        <span class="s-badge a-update">
+                            <i class="fa-solid fa-pen" style="font-size:9px;"></i> UPDATE
+                        </span>
+                    {% else %}
+                        <span class="s-badge a-delete">
+                            <i class="fa-solid fa-trash" style="font-size:9px;"></i> {{ log.action }}
+                        </span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if log.changed_by %}
+                    <div style="display:flex;align-items:center;gap:7px;">
+                        <div class="audit-avatar" aria-hidden="true">{{ log.changed_by[0] | upper }}</div>
+                        <span style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ log.changed_by }}</span>
+                    </div>
+                    {% else %}
+                    <span style="color:var(--text-muted);">—</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    <span class="time-text">{{ log.changed_at }}</span>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align:center;padding:48px;color:var(--text-secondary);">
+                    <i class="fa-solid fa-inbox" style="font-size:28px;display:block;margin-bottom:10px;color:var(--text-muted);"></i>
+                    No audit entries yet. Changes to flight data will appear here.
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="atfm-card-footer">
+        <i class="fa-solid fa-circle-info" style="margin-right:5px;"></i>
+        Audit entries are written automatically by database triggers on
+        <strong>flight_plan</strong> and <strong>flight_operation</strong>.
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block page_title %}Upload CSV{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2>
+        <i class="fa-solid fa-upload" style="color:var(--blue);margin-right:10px;font-size:20px;"></i>
+        Upload Flight Data
+    </h2>
+    <p>Upload a CSV file to bulk-import new flight plans into the system.</p>
+</div>
+
+<div class="row g-3">
+
+    {# Upload form #}
+    <div class="col-lg-6">
+        <div class="atfm-card">
+            <div class="atfm-card-header">
+                <span class="card-title-text">
+                    <span class="card-dot"></span>
+                    Select File
+                </span>
+            </div>
+            <div style="padding:24px;">
+                <form method="POST" action="/upload" enctype="multipart/form-data">
+
+                    <div class="upload-zone" style="margin-bottom:24px;">
+                        <span class="uz-icon">📂</span>
+                        <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">
+                            Drop your CSV file here
+                        </div>
+                        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">
+                            or click to browse
+                        </div>
+                        <span style="background:var(--blue-dim);color:var(--cyan);border-radius:8px;padding:6px 16px;font-size:12.5px;font-weight:600;border:1px solid rgba(10,132,255,0.25);">
+                            .csv files only
+                        </span>
+                        <input type="file" name="file" accept=".csv" required>
+                    </div>
+
+                    <button type="submit" class="btn-atfm-primary" style="width:100%;justify-content:center;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        Upload &amp; Import
+                    </button>
+
+                </form>
+            </div>
+            <div class="atfm-card-footer">
+                <i class="fa-solid fa-shield-halved" style="margin-right:5px;"></i>
+                Only system admins and airline operators can upload.
+            </div>
+        </div>
+    </div>
+
+    {# Format guide #}
+    <div class="col-lg-6">
+        <div class="atfm-card h-100">
+            <div class="atfm-card-header">
+                <span class="card-title-text">
+                    <span class="card-dot" style="background:var(--green);box-shadow:0 0 6px rgba(30,184,122,0.5);"></span>
+                    CSV Format Guide
+                </span>
+            </div>
+            <div style="padding:20px;">
+
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+                    Your CSV must have exactly these 6 columns:
+                </p>
+
+                <table class="atfm-table" style="font-size:12.5px;">
+                    <thead>
+                        <tr>
+                            <th>Column</th>
+                            <th>Example</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code style="background:var(--bg-surface-2);padding:2px 8px;border-radius:5px;color:var(--cyan);font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);">flight_no</code></td>
+                            <td>AA_PHX_CLT</td>
+                            <td style="color:var(--text-secondary);">Unique identifier</td>
+                        </tr>
+                        <tr>
+                            <td><code style="background:var(--bg-surface-2);padding:2px 8px;border-radius:5px;color:var(--cyan);font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);">airline_code</code></td>
+                            <td>AA</td>
+                            <td style="color:var(--text-secondary);">Must exist in system</td>
+                        </tr>
+                        <tr>
+                            <td><code style="background:var(--bg-surface-2);padding:2px 8px;border-radius:5px;color:var(--cyan);font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);">origin</code></td>
+                            <td>PHX</td>
+                            <td style="color:var(--text-secondary);">Airport code</td>
+                        </tr>
+                        <tr>
+                            <td><code style="background:var(--bg-surface-2);padding:2px 8px;border-radius:5px;color:var(--cyan);font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);">destination</code></td>
+                            <td>CLT</td>
+                            <td style="color:var(--text-secondary);">Airport code</td>
+                        </tr>
+                        <tr>
+                            <td><code style="background:var(--bg-surface-2);padding:2px 8px;border-radius:5px;color:var(--cyan);font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);">sobt</code></td>
+                            <td>2020-01-01 08:00:00</td>
+                            <td style="color:var(--text-secondary);">Timestamp</td>
+                        </tr>
+                        <tr>
+                            <td><code style="background:var(--bg-surface-2);padding:2px 8px;border-radius:5px;color:var(--cyan);font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);">status</code></td>
+                            <td>PLANNED</td>
+                            <td style="color:var(--text-secondary);">PLANNED / DELAYED etc.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:16px;background:var(--bg-base);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+                    <div style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">
+                        Sample row
+                    </div>
+                    <code style="font-size:12px;color:var(--green);font-family:'IBM Plex Mono',monospace;word-break:break-all;">
+                        AA_PHX_LAX,AA,PHX,LAX,2020-01-02 07:30:00,PLANNED
+                    </code>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

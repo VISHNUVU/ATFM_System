@@ -1,0 +1,209 @@
+-- ================================================
+-- ATFM PROJECT - DAY 5 SQL QUERIES
+-- Date: 10 April 2026
+-- Goal: Row-Level Security, Audit Trigger,
+--       App DB User
+-- ================================================
+
+-- ------------------------------------------------
+-- WHAT WE DO IN DAY 5:
+-- Step 1: Create atfm_app database user
+--         (non-superuser so RLS applies)
+-- Step 2: Grant table permissions to atfm_app
+-- Step 3: Enable Row-Level Security on flight_plan
+-- Step 4: Create airline isolation policy
+-- Step 5: Create audit trigger function
+-- Step 6: Attach trigger to flight_plan
+-- Step 7: Verify everything works
+-- ------------------------------------------------
+
+-- ================================================
+-- STEP 1: CREATE APP DATABASE USER
+-- Purpose: App must connect as a non-superuser
+--          for Row-Level Security to take effect.
+--          PostgreSQL superusers bypass RLS.
+-- ================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT FROM pg_roles WHERE rolname = 'atfm_app'
+    ) THEN
+        CREATE ROLE atfm_app
+            WITH LOGIN
+            PASSWORD 'atfm123'
+            NOSUPERUSER
+            NOCREATEDB
+            NOCREATEROLE;
+    END IF;
+END
+$$;
+
+-- ================================================
+-- STEP 2: GRANT PERMISSIONS TO atfm_app
+-- Grants SELECT, INSERT, UPDATE on all tables
+-- and sequence access for SERIAL columns
+-- ================================================
+GRANT SELECT, INSERT, UPDATE
+    ON ALL TABLES IN SCHEMA public
+    TO atfm_app;
+
+GRANT USAGE, SELECT
+    ON ALL SEQUENCES IN SCHEMA public
+    TO atfm_app;
+
+-- Verify grants
+SELECT grantee, table_name, privilege_type
+FROM information_schema.role_table_grants
+WHERE grantee = 'atfm_app'
+ORDER BY table_name;
+
+-- ================================================
+-- STEP 3: ENABLE ROW LEVEL SECURITY
+-- Purpose: Enforce data isolation at DB level
+--          Independent of application filtering
+-- ================================================
+ALTER TABLE flight_plan ENABLE ROW LEVEL SECURITY;
+
+-- ================================================
+-- STEP 4: CREATE AIRLINE ISOLATION POLICY
+-- Logic:
+--   IF app.current_airline is empty  → show ALL rows
+--      (used by admin, atc, observer etc.)
+--   IF app.current_airline is set    → show only
+--      rows matching that airline
+--      (used by airline_operator)
+-- ================================================
+DROP POLICY IF EXISTS airline_isolation ON flight_plan;
+
+CREATE POLICY airline_isolation ON flight_plan
+FOR ALL
+TO atfm_app
+USING (
+    current_setting('app.current_airline', true) IS NULL
+    OR current_setting('app.current_airline', true) = ''
+    OR airline_code = current_setting('app.current_airline', true)
+);
+
+-- Verify policy created
+SELECT schemaname, tablename, policyname, roles, cmd, qual
+FROM pg_policies
+WHERE tablename = 'flight_plan';
+
+-- ================================================
+-- STEP 5: CREATE AUDIT TRIGGER FUNCTION
+-- Purpose: Automatically log every INSERT and
+--          UPDATE on flight_plan into audit_log
+-- Uses:    app.current_user_id session variable
+--          set by Flask at connection time
+-- ================================================
+CREATE OR REPLACE FUNCTION fn_audit_flight_plan()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_user_id INT;
+BEGIN
+    -- Read the user ID set by Flask app on connect
+    -- NULLIF handles empty string safely
+    v_user_id := NULLIF(
+        current_setting('app.current_user_id', true), ''
+    )::INT;
+
+    INSERT INTO audit_log (
+        table_name,
+        record_id,
+        action,
+        changed_by,
+        changed_at
+    ) VALUES (
+        'flight_plan',
+        COALESCE(NEW.flight_plan_id, OLD.flight_plan_id),
+        TG_OP,
+        v_user_id,
+        now()
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ================================================
+-- STEP 6: CREATE TRIGGER ON flight_plan
+-- Fires AFTER every INSERT or UPDATE
+-- ================================================
+DROP TRIGGER IF EXISTS trg_audit_flight_plan
+    ON flight_plan;
+
+CREATE TRIGGER trg_audit_flight_plan
+AFTER INSERT OR UPDATE
+ON flight_plan
+FOR EACH ROW
+EXECUTE FUNCTION fn_audit_flight_plan();
+
+-- Verify trigger created
+SELECT trigger_name, event_manipulation,
+       event_object_table, action_timing
+FROM information_schema.triggers
+WHERE event_object_table = 'flight_plan';
+
+-- ================================================
+-- STEP 7: CREATE AUDIT TRIGGER FOR flight_operation
+-- Purpose: Also log stand/runway/status edits
+-- ================================================
+CREATE OR REPLACE FUNCTION fn_audit_flight_operation()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_user_id INT;
+BEGIN
+    v_user_id := NULLIF(
+        current_setting('app.current_user_id', true), ''
+    )::INT;
+
+    INSERT INTO audit_log (
+        table_name,
+        record_id,
+        action,
+        changed_by,
+        changed_at
+    ) VALUES (
+        'flight_operation',
+        COALESCE(NEW.op_id, OLD.op_id),
+        TG_OP,
+        v_user_id,
+        now()
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_audit_flight_operation
+    ON flight_operation;
+
+CREATE TRIGGER trg_audit_flight_operation
+AFTER INSERT OR UPDATE
+ON flight_operation
+FOR EACH ROW
+EXECUTE FUNCTION fn_audit_flight_operation();
+
+-- ================================================
+-- FINAL VERIFICATION QUERIES
+-- ================================================
+
+-- Check RLS is enabled
+SELECT relname, relrowsecurity, relforcerowsecurity
+FROM pg_class
+WHERE relname = 'flight_plan';
+
+-- Check audit_log is empty (no entries yet)
+SELECT COUNT(*) AS audit_entries FROM audit_log;
+
+-- ================================================
+-- TESTING REFERENCE
+-- ------------------------------------------------
+-- Role             | app.current_airline | Sees
+-- system_admin     | ''  (empty)         | ALL flights
+-- airline_operator | 'AA'               | AA only
+-- atc_controller   | ''  (empty)         | ALL flights
+-- airport_ops      | ''  (empty)         | ALL flights
+-- ai_analyst       | ''  (empty)         | ALL flights
+-- observer         | ''  (empty)         | ALL flights (read-only)
+-- ================================================

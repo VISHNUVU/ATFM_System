@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ATFM System",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["/Users/vishnuvu/Documents/ATFM project/ATFM_System/app.py"],
+      "port": 8080
+    }
+  ]
+}

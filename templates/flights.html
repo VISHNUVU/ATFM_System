@@ -1,0 +1,552 @@
+{% extends 'base.html' %}
+{% block page_title %}Flights{% endblock %}
+
+{% block content %}
+
+{# ── Page Header ── #}
+<div class="page-header">
+    <h2>
+        <i class="fa-solid fa-plane" style="color:var(--blue);margin-right:10px;font-size:19px;" aria-hidden="true"></i>
+        Flight Management
+    </h2>
+    <p>
+        ICAO-standard flight register
+        {% if role == 'airline_operator' %}&mdash; filtered to your airline{% endif %}
+        {% if role in ['observer', 'ai_analyst'] %}&mdash; <strong>read-only</strong> access{% endif %}
+    </p>
+</div>
+
+{# ── Filter Bar ── #}
+<form method="GET" action="/flights" id="flightFilterForm" role="search" aria-label="Flight filters">
+<div class="filter-bar">
+
+    {# Search #}
+    <div class="filter-search-wrap">
+        <label class="filter-label" for="flight_search">
+            <i class="fa-solid fa-magnifying-glass" style="margin-right:4px;" aria-hidden="true"></i>Search
+        </label>
+        <i class="fa-solid fa-magnifying-glass filter-search-icon" aria-hidden="true"></i>
+        <input type="text"
+               id="flight_search"
+               name="q"
+               class="filter-search"
+               placeholder="Callsign, airport, airline…"
+               value="{{ search_q }}"
+               aria-label="Search flights">
+    </div>
+
+    {# Airline dropdown (hidden for airline_operator) #}
+    {% if role != 'airline_operator' %}
+    <div class="filter-group">
+        <label class="filter-label" for="airline_filter">
+            <i class="fa-solid fa-plane-departure" style="margin-right:4px;" aria-hidden="true"></i>Airline
+        </label>
+        <select name="airline_filter" id="airline_filter" class="filter-select"
+                onchange="document.getElementById('flightFilterForm').submit()"
+                aria-label="Filter by airline">
+            <option value="">All Airlines</option>
+            {% for a in airlines_list %}
+            <option value="{{ a.airline_code }}" {{ 'selected' if airline_filter == a.airline_code }}>
+                {{ a.airline_code }} — {{ a.airline_name }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+
+    {# Status dropdown #}
+    <div class="filter-group">
+        <label class="filter-label" for="status_filter">
+            <i class="fa-solid fa-tag" style="margin-right:4px;" aria-hidden="true"></i>Status
+        </label>
+        <select name="status_filter" id="status_filter" class="filter-select"
+                onchange="document.getElementById('flightFilterForm').submit()"
+                aria-label="Filter by status">
+            <option value="">All Statuses</option>
+            <option value="PLANNED"   {{ 'selected' if status_filter == 'PLANNED' }}>Planned</option>
+            <option value="DEPARTED"  {{ 'selected' if status_filter == 'DEPARTED' }}>Departed</option>
+            <option value="DELAYED"   {{ 'selected' if status_filter == 'DELAYED' }}>Delayed</option>
+            <option value="CANCELLED" {{ 'selected' if status_filter == 'CANCELLED' }}>Cancelled</option>
+        </select>
+    </div>
+
+    {# Apply button (for search field — dropdowns auto-submit) #}
+    <div class="filter-group" style="justify-content:flex-end;">
+        <label class="filter-label">&nbsp;</label>
+        <button type="submit" class="btn-atfm-primary"
+                style="padding:7px 16px;font-size:12.5px;border-radius:var(--radius-sm);">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Search
+        </button>
+    </div>
+
+    {# Active filter pills + clear #}
+    {% if airline_filter or status_filter or search_q %}
+    <div class="filter-active-pills" aria-label="Active filters">
+        {% if search_q %}
+        <span class="filter-pill">
+            <i class="fa-solid fa-magnifying-glass" style="margin-right:4px;font-size:10px;" aria-hidden="true"></i>
+            "{{ search_q }}"
+        </span>
+        {% endif %}
+        {% if airline_filter %}
+        <span class="filter-pill">
+            <i class="fa-solid fa-plane-departure" style="margin-right:4px;font-size:10px;" aria-hidden="true"></i>
+            {{ airline_filter }}
+        </span>
+        {% endif %}
+        {% if status_filter %}
+        <span class="filter-pill">
+            <i class="fa-solid fa-tag" style="margin-right:4px;font-size:10px;" aria-hidden="true"></i>
+            {{ status_filter | title }}
+        </span>
+        {% endif %}
+    </div>
+    <a href="/flights" class="filter-clear" aria-label="Clear all filters">
+        <i class="fa-solid fa-xmark" style="margin-right:4px;" aria-hidden="true"></i>Clear
+    </a>
+    {% endif %}
+
+</div>
+</form>
+
+{# ── Main Flight Table Card ── #}
+<div class="atfm-card">
+
+    <div class="atfm-card-header">
+        <span class="card-title-text">
+            <span class="card-dot" aria-hidden="true"></span>
+            Flight Register
+        </span>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:11.5px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">
+                {{ total_count }} flight{{ 's' if total_count != 1 }}
+                {% if airline_filter or status_filter or search_q %}<span style="color:var(--amber);"> (filtered)</span>{% endif %}
+            </span>
+            <span class="card-badge">
+                <i class="fa-solid fa-sort" style="margin-right:4px;" aria-hidden="true"></i>Sortable
+            </span>
+        </div>
+    </div>
+
+    <div class="atfm-table-wrap">
+        <table class="atfm-table" id="flightTable" role="table" aria-label="Flight register">
+            <thead>
+                <tr role="row">
+                    <th scope="col" class="th-sort" data-col="0" aria-sort="none" tabindex="0"
+                        title="Flight Plan ID">#<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="1" aria-sort="none" tabindex="0"
+                        title="Callsign / Flight Number">CALLSIGN<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="2" aria-sort="none" tabindex="0"
+                        title="Airline Operator">AO<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="3" aria-sort="none" tabindex="0"
+                        title="Aerodrome of Departure">ADEP<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="4" aria-sort="none" tabindex="0"
+                        title="Aerodrome of Destination">ADES<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="5" aria-sort="none" tabindex="0"
+                        title="Scheduled Off-Block Time (UTC)">SOBT<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="6" aria-sort="none" tabindex="0"
+                        title="Actual Off-Block Time (UTC)">AOBT<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="7" aria-sort="none" tabindex="0"
+                        title="Actual Take-Off Time (UTC)">ATOT<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="8" aria-sort="none" tabindex="0"
+                        title="Off-block delay vs SOBT">DELAY<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="9" aria-sort="none" tabindex="0"
+                        title="Parking Stand">STAND<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="10" aria-sort="none" tabindex="0"
+                        title="Departure Runway">RWY<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    <th scope="col" class="th-sort" data-col="11" aria-sort="none" tabindex="0"
+                        title="Flight Operation Status">STATUS<i class="sort-icon fa-solid fa-sort" aria-hidden="true"></i></th>
+                    {% if role in ['system_admin','atc_controller','airport_ops','airline_operator'] %}
+                    <th scope="col">ACTION</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for f in flights %}
+            {# ISA-101: faint row tint only for abnormal states #}
+            <tr class="{% if f.status == 'DELAYED' %}row-delayed{% elif f.status == 'CANCELLED' %}row-cancelled{% endif %}"
+                role="row">
+
+                {# # — flight plan ID #}
+                <td data-sort="{{ f.flight_plan_id }}"
+                    style="color:var(--text-muted);font-size:11.5px;font-family:'IBM Plex Mono',monospace;">
+                    {{ f.flight_plan_id }}
+                </td>
+
+                {# CALLSIGN #}
+                <td data-sort="{{ f.flight_no }}">
+                    <span class="flight-no">{{ f.flight_no }}</span>
+                </td>
+
+                {# AO — Airline Operator #}
+                <td data-sort="{{ f.airline_code }}">
+                    <span class="code-text">{{ f.airline_code }}</span>
+                    <div class="sub-text">{{ f.airline_name }}</div>
+                </td>
+
+                {# ADEP — Aerodrome of Departure #}
+                <td data-sort="{{ f.origin }}">
+                    <span class="code-text">{{ f.origin }}</span>
+                    <div class="sub-text">{{ f.origin_name }}</div>
+                </td>
+
+                {# ADES — Aerodrome of Destination #}
+                <td data-sort="{{ f.destination }}">
+                    <span class="code-text">{{ f.destination }}</span>
+                    <div class="sub-text">{{ f.dest_name }}</div>
+                </td>
+
+                {# SOBT — Scheduled Off-Block Time #}
+                <td data-sort="{{ f.sobt }}">
+                    <span class="time-text">{{ f.sobt | utc_time }}</span>
+                </td>
+
+                {# AOBT — Actual Off-Block Time #}
+                <td data-sort="{{ f.aobt or '' }}">
+                    <span class="time-text">{{ f.aobt | utc_time }}</span>
+                </td>
+
+                {# ATOT — Actual Take-Off Time #}
+                <td data-sort="{{ f.atot or '' }}">
+                    <span class="time-text">{{ f.atot | utc_time }}</span>
+                </td>
+
+                {# DELAY — computed off-block delay in minutes #}
+                {% set dm = f.delay_minutes %}
+                <td data-sort="{{ dm if dm is not none else '' }}">
+                    {% if dm is not none %}
+                        {% set dmi = dm | int %}
+                        {% if dmi <= 0 %}
+                            <span class="delay-badge delay-ok">
+                                <i class="fa-solid fa-check" style="font-size:9px;" aria-hidden="true"></i> On time
+                            </span>
+                        {% elif dmi <= 15 %}
+                            <span class="delay-badge delay-ok">+{{ dmi }}m</span>
+                        {% elif dmi <= 60 %}
+                            <span class="delay-badge delay-caution">+{{ dmi }}m</span>
+                        {% else %}
+                            <span class="delay-badge delay-warn">+{{ dmi }}m</span>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:var(--text-muted);font-size:12px;">—</span>
+                    {% endif %}
+                </td>
+
+                {# STAND #}
+                <td data-sort="{{ f.stand or '' }}">
+                    {% if f.stand %}
+                    <span class="tbl-badge">{{ f.stand }}</span>
+                    {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+                </td>
+
+                {# RWY #}
+                <td data-sort="{{ f.runway or '' }}">
+                    {% if f.runway %}
+                    <span class="tbl-badge">{{ f.runway }}</span>
+                    {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+                </td>
+
+                {# STATUS #}
+                {% set s = f.status | upper if f.status else '' %}
+                <td data-sort="{{ s }}">
+                    {% if s == 'DEPARTED' %}
+                        <span class="s-badge s-departed">
+                            <i class="fa-solid fa-circle-check" style="font-size:8px;" aria-hidden="true"></i> Departed
+                        </span>
+                    {% elif s == 'DELAYED' %}
+                        <span class="s-badge s-delayed">
+                            <i class="fa-solid fa-clock" style="font-size:8px;" aria-hidden="true"></i> Delayed
+                        </span>
+                    {% elif s == 'CANCELLED' %}
+                        <span class="s-badge s-cancelled">
+                            <i class="fa-solid fa-ban" style="font-size:8px;" aria-hidden="true"></i> Cancelled
+                        </span>
+                    {% elif s == 'PLANNED' %}
+                        <span class="s-badge s-planned">
+                            <i class="fa-solid fa-calendar-check" style="font-size:8px;" aria-hidden="true"></i> Planned
+                        </span>
+                    {% else %}
+                        <span class="s-badge s-other">{{ f.status or '—' }}</span>
+                    {% endif %}
+                </td>
+
+                {# ACTION — role-gated edit button #}
+                {% if role in ['system_admin','atc_controller','airport_ops','airline_operator'] %}
+                <td>
+                    <button class="btn-edit"
+                            data-bs-toggle="modal"
+                            data-bs-target="#editModal"
+                            data-flight-id="{{ f.flight_plan_id }}"
+                            data-flight-no="{{ f.flight_no }}"
+                            data-stand="{{ f.stand or '' }}"
+                            data-runway="{{ f.runway or '' }}"
+                            data-status="{{ f.status or '' }}"
+                            aria-label="Edit flight {{ f.flight_no }}">
+                        <i class="fa-solid fa-pen-to-square" style="margin-right:4px;" aria-hidden="true"></i>Edit
+                    </button>
+                </td>
+                {% endif %}
+
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="13">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-plane-slash" aria-hidden="true"></i>
+                        <p>No flights match the current filters.</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# ── Pagination ── #}
+    <div class="pagination-bar" role="navigation" aria-label="Table pagination">
+        <div class="pag-info">
+            {% if total_count > 0 %}
+            Showing {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total_count] | min }}
+            of {{ total_count }} flights
+            {% else %}
+            No results
+            {% endif %}
+        </div>
+        <div class="pag-controls">
+            {# First page #}
+            {% if page > 1 %}
+            <a href="/flights?{{ base_qs }}{% if base_qs %}&{% endif %}page=1"
+               class="pag-btn" title="First page" aria-label="First page">
+                <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
+            </a>
+            <a href="/flights?{{ base_qs }}{% if base_qs %}&{% endif %}page={{ page - 1 }}"
+               class="pag-btn" title="Previous page" aria-label="Previous page">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="pag-btn pag-disabled" aria-disabled="true"><i class="fa-solid fa-angles-left" aria-hidden="true"></i></span>
+            <span class="pag-btn pag-disabled" aria-disabled="true"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></span>
+            {% endif %}
+
+            <span class="pag-current" aria-current="page">
+                {{ page }} / {{ total_pages }}
+            </span>
+
+            {% if page < total_pages %}
+            <a href="/flights?{{ base_qs }}{% if base_qs %}&{% endif %}page={{ page + 1 }}"
+               class="pag-btn" title="Next page" aria-label="Next page">
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            <a href="/flights?{{ base_qs }}{% if base_qs %}&{% endif %}page={{ total_pages }}"
+               class="pag-btn" title="Last page" aria-label="Last page">
+                <i class="fa-solid fa-angles-right" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="pag-btn pag-disabled" aria-disabled="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+            <span class="pag-btn pag-disabled" aria-disabled="true"><i class="fa-solid fa-angles-right" aria-hidden="true"></i></span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="atfm-card-footer" style="border-top:none;padding-top:0;">
+        {% if role in ['observer','ai_analyst'] %}
+        <i class="fa-solid fa-lock" style="margin-right:5px;" aria-hidden="true"></i> Read-only access
+        {% else %}
+        <i class="fa-solid fa-circle-info" style="margin-right:5px;" aria-hidden="true"></i>
+        Click <strong>Edit</strong> to update
+        {% if role == 'atc_controller' %}RWY{% elif role == 'airport_ops' %}STAND{% elif role == 'airline_operator' %}STATUS{% else %}STAND, RWY, or STATUS{% endif %}.
+        &nbsp;·&nbsp; Click column header to sort.
+        {% endif %}
+    </div>
+
+</div>
+
+{# ══════════════════════════════════════════════
+   EDIT MODAL (role-gated fields)
+   ══════════════════════════════════════════════ #}
+{% if role in ['system_admin','atc_controller','airport_ops','airline_operator'] %}
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header" style="padding:18px 22px;">
+                <div>
+                    <h5 class="modal-title" id="editModalTitle"
+                        style="font-weight:700;margin:0;font-size:15px;">
+                        <i class="fa-solid fa-pen-to-square"
+                           style="margin-right:8px;color:var(--blue);" aria-hidden="true"></i>
+                        Edit Flight
+                        <span id="modalFlightNo"
+                              style="margin-left:8px;background:var(--blue-dim);color:var(--cyan);
+                                     padding:3px 10px;border-radius:20px;font-size:12px;
+                                     border:1px solid rgba(10,132,255,0.3);
+                                     font-family:'IBM Plex Mono',monospace;"></span>
+                    </h5>
+                    <p style="color:var(--text-secondary);font-size:12px;margin:4px 0 0;">
+                        Role: <strong>{{ role | replace('_',' ') | title }}</strong>
+                        &mdash; only permitted fields are shown
+                    </p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                        aria-label="Close edit modal"></button>
+            </div>
+
+            <form id="editForm" method="POST">
+                <div class="modal-body" style="padding:22px;">
+
+                    {% if role in ['system_admin','airport_ops'] %}
+                    <div style="margin-bottom:16px;">
+                        <label class="f-label" for="editStand">
+                            <i class="fa-solid fa-square-parking"
+                               style="margin-right:6px;color:var(--blue);" aria-hidden="true"></i>
+                            STAND
+                        </label>
+                        <input type="text" id="editStand" name="stand"
+                               class="f-input" placeholder="e.g. A1, B3">
+                    </div>
+                    {% endif %}
+
+                    {% if role in ['system_admin','atc_controller'] %}
+                    <div style="margin-bottom:16px;">
+                        <label class="f-label" for="editRunway">
+                            <i class="fa-solid fa-road"
+                               style="margin-right:6px;color:var(--blue);" aria-hidden="true"></i>
+                            RUNWAY
+                        </label>
+                        <input type="text" id="editRunway" name="runway"
+                               class="f-input" placeholder="e.g. 25R, 30L">
+                    </div>
+                    {% endif %}
+
+                    {% if role in ['system_admin','airline_operator'] %}
+                    <div>
+                        <label class="f-label" for="editStatus">
+                            <i class="fa-solid fa-tag"
+                               style="margin-right:6px;color:var(--blue);" aria-hidden="true"></i>
+                            STATUS
+                        </label>
+                        <select id="editStatus" name="status"
+                                class="f-select" style="cursor:pointer;">
+                            <option value="PLANNED">Planned</option>
+                            <option value="DEPARTED">Departed</option>
+                            <option value="DELAYED">Delayed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+                    </div>
+                    {% endif %}
+
+                </div>
+
+                <div class="modal-footer" style="padding:14px 22px;gap:10px;">
+                    <button type="button" class="btn-cancel"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-atfm-primary"
+                            style="padding:9px 20px;font-size:13px;">
+                        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ══════════════════════════════════════════════════════════
+   Modal pre-population
+   ══════════════════════════════════════════════════════════ */
+(function () {
+    const modal = document.getElementById('editModal');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (e) {
+        const btn    = e.relatedTarget;
+        const id     = btn.dataset.flightId;
+        const no     = btn.dataset.flightNo;
+        const stand  = btn.dataset.stand;
+        const runway = btn.dataset.runway;
+        const status = btn.dataset.status;
+
+        document.getElementById('editForm').action = '/edit_flight/' + id;
+        document.getElementById('modalFlightNo').textContent = no;
+
+        const s = document.getElementById('editStand');
+        const r = document.getElementById('editRunway');
+        const x = document.getElementById('editStatus');
+        if (s) s.value = stand;
+        if (r) r.value = runway;
+        if (x) x.value = status || 'PLANNED';
+    });
+})();
+
+/* ══════════════════════════════════════════════════════════
+   Sortable columns — vanilla JS, no dependencies
+   Supports numeric and string sort, aria-sort attributes
+   ══════════════════════════════════════════════════════════ */
+(function () {
+    const table = document.getElementById('flightTable');
+    if (!table) return;
+
+    let sortCol = -1, sortDir = 1;
+
+    table.querySelectorAll('th.th-sort').forEach(function (th) {
+
+        th.addEventListener('click', function () {
+            const col = parseInt(this.dataset.col, 10);
+            sortDir = (sortCol === col) ? sortDir * -1 : 1;
+            sortCol = col;
+
+            // Reset all aria-sort + icon states
+            table.querySelectorAll('th.th-sort').forEach(function (h) {
+                h.setAttribute('aria-sort', 'none');
+                const ic = h.querySelector('.sort-icon');
+                if (ic) ic.className = 'sort-icon fa-solid fa-sort';
+            });
+
+            // Apply to clicked header
+            this.setAttribute('aria-sort', sortDir === 1 ? 'ascending' : 'descending');
+            const icon = this.querySelector('.sort-icon');
+            if (icon) icon.className = 'sort-icon fa-solid fa-sort-' + (sortDir === 1 ? 'up' : 'down');
+
+            // Sort body rows
+            const tbody = table.querySelector('tbody');
+            const rows  = Array.from(tbody.querySelectorAll('tr'));
+
+            rows.sort(function (a, b) {
+                const aCell = a.cells[col];
+                const bCell = b.cells[col];
+                if (!aCell || !bCell) return 0;
+
+                const aRaw = (aCell.dataset.sort !== undefined)
+                    ? aCell.dataset.sort : aCell.textContent.trim();
+                const bRaw = (bCell.dataset.sort !== undefined)
+                    ? bCell.dataset.sort : bCell.textContent.trim();
+
+                // Try numeric (covers delay_minutes, IDs)
+                const aN = parseFloat(aRaw), bN = parseFloat(bRaw);
+                if (!isNaN(aN) && !isNaN(bN)) return (aN - bN) * sortDir;
+
+                // Empty values always last
+                if (!aRaw && bRaw) return 1;
+                if (aRaw && !bRaw) return -1;
+
+                return aRaw.localeCompare(bRaw, undefined, { sensitivity: 'base' }) * sortDir;
+            });
+
+            rows.forEach(function (row) { tbody.appendChild(row); });
+        });
+
+        // Keyboard accessibility: Enter / Space triggers sort
+        th.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

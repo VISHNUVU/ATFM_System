@@ -1,0 +1,114 @@
+-- ================================================
+-- ATFM PROJECT - DAY 4 SQL PATCH
+-- Date: 10 April 2026
+-- Purpose: Fix all gaps found in Days 1-3 before
+--          Day 5 work begins
+-- ================================================
+
+-- ------------------------------------------------
+-- WHAT THIS PATCH FIXES:
+-- Fix 1: Add airline_code column to app_user
+--        (used by app.py but missing from schema)
+-- Fix 2: Update all 6 users with real bcrypt
+--        hashed passwords (plain text 'pass123'
+--        will not work with bcrypt login check)
+-- Fix 3: Set airline_code for airline_ba user
+--        so airline-level filtering works
+-- ------------------------------------------------
+
+-- ================================================
+-- FIX 1: ADD airline_code TO app_user
+-- The Flask app reads this column at login to
+-- filter flight data for airline_operator role
+-- ================================================
+ALTER TABLE app_user
+ADD COLUMN IF NOT EXISTS airline_code VARCHAR(5)
+REFERENCES airline_master(airline_code);
+
+-- Verify column added
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'app_user'
+AND column_name = 'airline_code';
+
+-- ================================================
+-- FIX 2: UPDATE ALL PASSWORDS TO BCRYPT HASHES
+-- Password for all users: password123
+-- Hashed using bcrypt with 12 rounds
+-- ================================================
+UPDATE app_user
+SET password_hash = '$2b$12$MevNVbNnuwn.odqf/0R59O9rodmP2QcBuHK.HD5JvzbafI62QninO'
+WHERE username = 'admin1';
+
+UPDATE app_user
+SET password_hash = '$2b$12$nJ3qH3/NzjeUHoAr089XnuT9QWyUAYWjqprgJcOPPG81AItEYC/PG'
+WHERE username = 'airline_ba';
+
+UPDATE app_user
+SET password_hash = '$2b$12$2b4M6E03eQ8qQ0PcONBtruv3TPhmn7SIkvdjnHA2cGAFat7DZEbqW'
+WHERE username = 'atc_dxb';
+
+UPDATE app_user
+SET password_hash = '$2b$12$2De3ZCNv0fdqxazcJXp1ruiV2VZof1/ZJPluxTQ2sYK3fNHIE/C22'
+WHERE username = 'airport_ops1';
+
+UPDATE app_user
+SET password_hash = '$2b$12$tcqbKeLucwp.e9SqDCnvC.M9iVO9pbgnzRw3lhhisYVYTYTa7A8F6'
+WHERE username = 'ai_analyst1';
+
+UPDATE app_user
+SET password_hash = '$2b$12$TgfzP2Z/apuI2gIxQvjG9OMnSGNSanyeMD9yP6zZ5UeiR5Jj9eD3K'
+WHERE username = 'observer1';
+
+-- Verify passwords updated (should show 6 rows)
+SELECT username, full_name,
+       LEFT(password_hash, 7) AS hash_prefix
+FROM app_user
+ORDER BY user_id;
+
+-- ================================================
+-- FIX 3: SET airline_code FOR airline_ba
+-- British Airways maps to 'AA' is wrong —
+-- there is no BAW in airline_master.
+-- Closest match using BTS 2020 data is 'AA'
+-- (American Airlines).
+-- Assign airline_ba to AA so filtering works.
+-- ================================================
+UPDATE app_user
+SET airline_code = 'AA'
+WHERE username = 'airline_ba';
+
+-- Verify airline assignment
+SELECT username, full_name, airline_code
+FROM app_user
+WHERE username = 'airline_ba';
+
+-- ================================================
+-- FINAL VERIFICATION
+-- Shows all users with role and airline_code
+-- ================================================
+SELECT
+    u.user_id,
+    u.username,
+    u.full_name,
+    u.airline_code,
+    u.is_active,
+    LEFT(u.password_hash, 7) AS hash_prefix,
+    r.role_name
+FROM app_user u
+JOIN user_role ur ON u.user_id = ur.user_id
+JOIN role r ON ur.role_id = r.role_id
+ORDER BY u.user_id;
+
+-- ================================================
+-- LOGIN TEST REFERENCE
+-- All users use password: password123
+-- ------------------------------------------------
+-- username      | role              | airline
+-- admin1        | system_admin      | NULL
+-- airline_ba    | airline_operator  | AA
+-- atc_dxb       | atc_controller    | NULL
+-- airport_ops1  | airport_ops       | NULL
+-- ai_analyst1   | ai_analyst        | NULL
+-- observer1     | observer          | NULL
+-- ================================================
