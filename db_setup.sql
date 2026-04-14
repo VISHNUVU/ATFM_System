@@ -81,13 +81,13 @@ BEGIN
         IF TG_TABLE_NAME = 'flight_plan' THEN
             v_record_id := OLD.flight_plan_id;
         ELSIF TG_TABLE_NAME = 'flight_operation' THEN
-            v_record_id := OLD.operation_id;
+            v_record_id := OLD.op_id;
         END IF;
     ELSE
         IF TG_TABLE_NAME = 'flight_plan' THEN
             v_record_id := NEW.flight_plan_id;
         ELSIF TG_TABLE_NAME = 'flight_operation' THEN
-            v_record_id := NEW.operation_id;
+            v_record_id := NEW.op_id;
         END IF;
     END IF;
 
