@@ -64,6 +64,40 @@ CREATE TABLE IF NOT EXISTS audit_log (
     changed_at      TIMESTAMPTZ DEFAULT now()
 );
 
+-- Audit trigger function: reads app.current_user_id set by Flask
+CREATE OR REPLACE FUNCTION fn_audit_log()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_user_id INTEGER;
+    v_record_id INTEGER;
+BEGIN
+    BEGIN
+        v_user_id := current_setting('app.current_user_id', true)::INTEGER;
+    EXCEPTION WHEN OTHERS THEN
+        v_user_id := NULL;
+    END;
+
+    IF TG_OP = 'DELETE' THEN
+        IF TG_TABLE_NAME = 'flight_plan' THEN
+            v_record_id := OLD.flight_plan_id;
+        ELSIF TG_TABLE_NAME = 'flight_operation' THEN
+            v_record_id := OLD.operation_id;
+        END IF;
+    ELSE
+        IF TG_TABLE_NAME = 'flight_plan' THEN
+            v_record_id := NEW.flight_plan_id;
+        ELSIF TG_TABLE_NAME = 'flight_operation' THEN
+            v_record_id := NEW.operation_id;
+        END IF;
+    END IF;
+
+    INSERT INTO audit_log (table_name, record_id, action, changed_by, changed_at)
+    VALUES (TG_TABLE_NAME, v_record_id, TG_OP, v_user_id, now());
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE TABLE IF NOT EXISTS airline_master (
     airline_code VARCHAR(5) PRIMARY KEY,
     airline_name VARCHAR(100) NOT NULL
@@ -279,3 +313,15 @@ INSERT INTO flight_operation (flight_plan_id, aobt, atot, stand, runway, status)
 (14, '2020-01-01 00:40:00+00', '2020-01-01 00:52:00+00', 'C4', '24L', 'DEPARTED'),
 (15, '2020-01-01 00:36:00+00', '2020-01-01 00:49:00+00', 'A6', '25R', 'DEPARTED')
 ON CONFLICT DO NOTHING;
+
+-- Audit triggers on flight_plan and flight_operation
+DROP TRIGGER IF EXISTS trg_audit_flight_plan ON flight_plan;
+DROP TRIGGER IF EXISTS trg_audit_flight_operation ON flight_operation;
+
+CREATE TRIGGER trg_audit_flight_plan
+AFTER INSERT OR UPDATE OR DELETE ON flight_plan
+FOR EACH ROW EXECUTE FUNCTION fn_audit_log();
+
+CREATE TRIGGER trg_audit_flight_operation
+AFTER INSERT OR UPDATE OR DELETE ON flight_operation
+FOR EACH ROW EXECUTE FUNCTION fn_audit_log();
