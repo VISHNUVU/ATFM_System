@@ -1119,28 +1119,102 @@ def audit():
         flash('Access denied — admin only.', 'danger')
         return redirect(url_for('dashboard'))
 
+    # Filter params
+    f_action = request.args.get('action', '')
+    f_table  = request.args.get('table', '')
+    f_user   = request.args.get('user', '')
+    f_date   = request.args.get('date', '')
+
     try:
         conn = get_db()
-        df = pd.read_sql("""
+        cur  = conn.cursor()
+
+        # Build dynamic WHERE clause
+        conditions = []
+        params = []
+        if f_action:
+            conditions.append("al.action = %s")
+            params.append(f_action)
+        if f_table:
+            conditions.append("al.table_name = %s")
+            params.append(f_table)
+        if f_user:
+            conditions.append("u.username = %s")
+            params.append(f_user)
+        if f_date:
+            conditions.append("al.changed_at::date = %s")
+            params.append(f_date)
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        df = pd.read_sql(f"""
             SELECT
                 al.audit_id,
                 al.table_name,
                 al.record_id,
                 al.action,
-                u.username   AS changed_by,
-                al.changed_at
+                u.username      AS changed_by,
+                u.full_name     AS changed_by_full,
+                al.changed_at,
+                al.old_values,
+                al.new_values
             FROM audit_log al
-            LEFT JOIN app_user u
-                ON al.changed_by = u.user_id
+            LEFT JOIN app_user u ON al.changed_by = u.user_id
+            {where}
             ORDER BY al.changed_at DESC
-            LIMIT 100
-        """, conn)
+            LIMIT 200
+        """, conn, params=params if params else None)
+
+        # Summary stats
+        cur.execute("SELECT COUNT(*) FROM audit_log")
+        total = cur.fetchone()[0]
+
+        cur.execute("SELECT action, COUNT(*) FROM audit_log GROUP BY action")
+        action_counts = dict(cur.fetchall())
+
+        cur.execute("""
+            SELECT u.username, COUNT(*) as cnt
+            FROM audit_log al
+            LEFT JOIN app_user u ON al.changed_by = u.user_id
+            GROUP BY u.username ORDER BY cnt DESC LIMIT 5
+        """)
+        top_users = cur.fetchall()
+
+        cur.execute("""
+            SELECT table_name, COUNT(*) as cnt
+            FROM audit_log GROUP BY table_name ORDER BY cnt DESC
+        """)
+        table_counts = cur.fetchall()
+
+        cur.execute("""
+            SELECT DATE(changed_at) as day, COUNT(*) as cnt
+            FROM audit_log
+            GROUP BY day ORDER BY day DESC LIMIT 7
+        """)
+        daily_activity = cur.fetchall()
+
+        # Distinct users for filter dropdown
+        cur.execute("SELECT DISTINCT username FROM app_user WHERE username IS NOT NULL ORDER BY username")
+        all_users = [r[0] for r in cur.fetchall()]
+
+        cur.close()
         conn.close()
+
         logs = df.to_dict('records')
         return render_template('audit.html',
             logs=logs,
             username=session.get('full_name'),
-            role=session.get('role')
+            role=session.get('role'),
+            total=total,
+            action_counts=action_counts,
+            top_users=top_users,
+            table_counts=table_counts,
+            daily_activity=daily_activity,
+            all_users=all_users,
+            f_action=f_action,
+            f_table=f_table,
+            f_user=f_user,
+            f_date=f_date,
         )
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')

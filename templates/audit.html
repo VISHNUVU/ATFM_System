@@ -8,94 +8,306 @@
         <i class="fa-solid fa-shield-halved" style="color:var(--blue);margin-right:10px;font-size:20px;"></i>
         Audit Log
     </h2>
-    <p>Every INSERT and UPDATE on flight data — last 100 entries.</p>
+    <p>Full change history — every INSERT, UPDATE and DELETE on flight data.</p>
 </div>
 
-<div class="atfm-card">
+<!-- ── STAT CARDS ──────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;">
 
+    <div class="atfm-card" style="padding:18px 20px;margin:0;">
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Total Events</div>
+        <div style="font-size:28px;font-weight:700;color:var(--text-primary);">{{ total }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">all time</div>
+    </div>
+
+    <div class="atfm-card" style="padding:18px 20px;margin:0;">
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Inserts</div>
+        <div style="font-size:28px;font-weight:700;color:#3ecf8e;">{{ action_counts.get('INSERT', 0) }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">new records created</div>
+    </div>
+
+    <div class="atfm-card" style="padding:18px 20px;margin:0;">
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Updates</div>
+        <div style="font-size:28px;font-weight:700;color:var(--amber);">{{ action_counts.get('UPDATE', 0) }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">records modified</div>
+    </div>
+
+    <div class="atfm-card" style="padding:18px 20px;margin:0;">
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Deletes</div>
+        <div style="font-size:28px;font-weight:700;color:var(--red);">{{ action_counts.get('DELETE', 0) }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">records removed</div>
+    </div>
+
+    <div class="atfm-card" style="padding:18px 20px;margin:0;">
+        <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Tables Tracked</div>
+        <div style="font-size:28px;font-weight:700;color:var(--blue);">{{ table_counts | length }}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+            {% for t, c in table_counts %}{{ t }}{% if not loop.last %}, {% endif %}{% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── TWO-COLUMN: top users + daily activity ─────────── -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;">
+
+    <div class="atfm-card" style="margin:0;">
+        <div class="atfm-card-header">
+            <span class="card-title-text">
+                <span class="card-dot" style="background:var(--blue);box-shadow:0 0 6px rgba(99,102,241,.5);"></span>
+                Most Active Users
+            </span>
+        </div>
+        <div style="padding:12px 18px;">
+            {% if top_users %}
+            {% for uname, cnt in top_users %}
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="audit-avatar">{{ (uname or '?')[0] | upper }}</div>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ uname or 'System' }}</span>
+                </div>
+                <span style="font-size:12px;font-weight:700;color:var(--blue);background:rgba(99,102,241,.12);padding:2px 10px;border-radius:20px;">{{ cnt }} events</span>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p style="color:var(--text-muted);font-size:13px;padding:12px 0;">No activity yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="atfm-card" style="margin:0;">
+        <div class="atfm-card-header">
+            <span class="card-title-text">
+                <span class="card-dot" style="background:var(--amber);box-shadow:0 0 6px rgba(245,166,35,.5);"></span>
+                Daily Activity (Last 7 Days)
+            </span>
+        </div>
+        <div style="padding:12px 18px;">
+            {% if daily_activity %}
+            {% for day, cnt in daily_activity %}
+            {% set pct = [(cnt / (daily_activity[0][1] if daily_activity[0][1] > 0 else 1) * 100) | int, 4] | max %}
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:11px;color:var(--text-secondary);width:90px;flex-shrink:0;">{{ day }}</span>
+                <div style="flex:1;background:var(--surface2);border-radius:4px;height:8px;overflow:hidden;">
+                    <div style="width:{{ pct }}%;background:var(--amber);height:100%;border-radius:4px;"></div>
+                </div>
+                <span style="font-size:12px;font-weight:700;color:var(--text-primary);width:30px;text-align:right;">{{ cnt }}</span>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p style="color:var(--text-muted);font-size:13px;padding:12px 0;">No activity yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── FILTERS ─────────────────────────────────────────── -->
+<div class="atfm-card" style="margin-bottom:20px;">
+    <form method="get" action="/audit">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;padding:16px 18px;align-items:flex-end;">
+
+            <div style="display:flex;flex-direction:column;gap:5px;">
+                <label style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;">Action</label>
+                <select name="action" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-primary);border-radius:8px;padding:7px 12px;font-size:13px;min-width:130px;">
+                    <option value="">All Actions</option>
+                    <option value="INSERT" {% if f_action=='INSERT' %}selected{% endif %}>INSERT</option>
+                    <option value="UPDATE" {% if f_action=='UPDATE' %}selected{% endif %}>UPDATE</option>
+                    <option value="DELETE" {% if f_action=='DELETE' %}selected{% endif %}>DELETE</option>
+                </select>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:5px;">
+                <label style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;">Table</label>
+                <select name="table" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-primary);border-radius:8px;padding:7px 12px;font-size:13px;min-width:160px;">
+                    <option value="">All Tables</option>
+                    <option value="flight_plan" {% if f_table=='flight_plan' %}selected{% endif %}>flight_plan</option>
+                    <option value="flight_operation" {% if f_table=='flight_operation' %}selected{% endif %}>flight_operation</option>
+                </select>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:5px;">
+                <label style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;">User</label>
+                <select name="user" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-primary);border-radius:8px;padding:7px 12px;font-size:13px;min-width:140px;">
+                    <option value="">All Users</option>
+                    {% for u in all_users %}
+                    <option value="{{ u }}" {% if f_user==u %}selected{% endif %}>{{ u }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:5px;">
+                <label style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;">Date</label>
+                <input type="date" name="date" value="{{ f_date }}"
+                    style="background:var(--surface2);border:1px solid var(--border);color:var(--text-primary);border-radius:8px;padding:7px 12px;font-size:13px;">
+            </div>
+
+            <button type="submit" class="btn-primary" style="padding:8px 20px;font-size:13px;height:36px;">
+                <i class="fa-solid fa-filter" style="margin-right:6px;"></i>Filter
+            </button>
+            {% if f_action or f_table or f_user or f_date %}
+            <a href="/audit" style="padding:8px 16px;font-size:13px;height:36px;display:flex;align-items:center;color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;text-decoration:none;">
+                <i class="fa-solid fa-xmark" style="margin-right:6px;"></i>Clear
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- ── TIMELINE LOG ────────────────────────────────────── -->
+<div class="atfm-card">
     <div class="atfm-card-header">
         <span class="card-title-text">
             <span class="card-dot" style="background:var(--amber);box-shadow:0 0 6px rgba(245,166,35,0.5);"></span>
-            System Activity
+            Change Timeline
         </span>
         <span style="font-size:12px;color:var(--text-secondary);">
             <i class="fa-solid fa-clock-rotate-left" style="margin-right:4px;"></i>
-            {{ logs | length }} entries
+            {{ logs | length }} entries shown
+            {% if f_action or f_table or f_user or f_date %}<span style="color:var(--blue);margin-left:6px;">(filtered)</span>{% endif %}
         </span>
     </div>
 
-    <div class="atfm-table-wrap">
-        <table class="atfm-table">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Table</th>
-                    <th>Record ID</th>
-                    <th>Action</th>
-                    <th>Changed By</th>
-                    <th>Timestamp</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for log in logs %}
-            <tr>
-                <td style="color:var(--text-secondary);font-size:12px;">{{ log.audit_id }}</td>
+    {% if logs %}
+    <div style="padding:0 4px;">
+    {% for log in logs %}
 
-                <td>
-                    <span class="tbl-badge">{{ log.table_name }}</span>
-                </td>
+    {# ── colour + icon per action ── #}
+    {% if log.action == 'INSERT' %}
+        {% set ac = '#3ecf8e' %}{% set ab = 'rgba(62,207,142,.12)' %}
+        {% set icon = 'fa-plus' %}{% set label = 'INSERT' %}
+    {% elif log.action == 'UPDATE' %}
+        {% set ac = '#f5a623' %}{% set ab = 'rgba(245,166,35,.12)' %}
+        {% set icon = 'fa-pen' %}{% set label = 'UPDATE' %}
+    {% else %}
+        {% set ac = '#ef4444' %}{% set ab = 'rgba(239,68,68,.12)' %}
+        {% set icon = 'fa-trash' %}{% set label = 'DELETE' %}
+    {% endif %}
 
-                <td style="font-weight:600;color:var(--text-secondary);">{{ log.record_id }}</td>
+    <div style="border-left:3px solid {{ ac }};margin:0 18px 0 18px;padding:16px 0 16px 20px;border-bottom:1px solid var(--border);">
 
-                <td>
-                    {% if log.action == 'INSERT' %}
-                        <span class="s-badge a-insert">
-                            <i class="fa-solid fa-plus" style="font-size:9px;"></i> INSERT
-                        </span>
-                    {% elif log.action == 'UPDATE' %}
-                        <span class="s-badge a-update">
-                            <i class="fa-solid fa-pen" style="font-size:9px;"></i> UPDATE
-                        </span>
-                    {% else %}
-                        <span class="s-badge a-delete">
-                            <i class="fa-solid fa-trash" style="font-size:9px;"></i> {{ log.action }}
-                        </span>
-                    {% endif %}
-                </td>
+        <!-- Row header -->
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
 
-                <td>
-                    {% if log.changed_by %}
-                    <div style="display:flex;align-items:center;gap:7px;">
-                        <div class="audit-avatar" aria-hidden="true">{{ log.changed_by[0] | upper }}</div>
-                        <span style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ log.changed_by }}</span>
-                    </div>
-                    {% else %}
-                    <span style="color:var(--text-muted);">—</span>
-                    {% endif %}
-                </td>
+            <span style="background:{{ ab }};color:{{ ac }};border:1px solid {{ ac }}33;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.05em;display:flex;align-items:center;gap:5px;">
+                <i class="fa-solid {{ icon }}" style="font-size:9px;"></i> {{ label }}
+            </span>
 
-                <td>
-                    <span class="time-text">{{ log.changed_at }}</span>
-                </td>
-            </tr>
+            <span class="tbl-badge" style="font-size:11px;">{{ log.table_name }}</span>
+
+            <span style="font-size:12px;color:var(--text-secondary);">
+                Record&nbsp;<strong style="color:var(--text-primary);">#{{ log.record_id }}</strong>
+            </span>
+
+            <span style="margin-left:auto;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:5px;">
+                <i class="fa-regular fa-clock"></i>
+                {{ log.changed_at }}
+            </span>
+        </div>
+
+        <!-- Who did it -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:{% if log.new_values or log.old_values %}12{% else %}0{% endif %}px;">
+            {% if log.changed_by %}
+            <div class="audit-avatar" style="width:24px;height:24px;font-size:10px;">{{ log.changed_by[0] | upper }}</div>
+            <span style="font-size:12px;color:var(--text-secondary);">
+                Changed by <strong style="color:var(--text-primary);">{{ log.changed_by_full or log.changed_by }}</strong>
+                <span style="color:var(--text-muted);"> ({{ log.changed_by }})</span>
+            </span>
             {% else %}
-            <tr>
-                <td colspan="6" style="text-align:center;padding:48px;color:var(--text-secondary);">
-                    <i class="fa-solid fa-inbox" style="font-size:28px;display:block;margin-bottom:10px;color:var(--text-muted);"></i>
-                    No audit entries yet. Changes to flight data will appear here.
-                </td>
-            </tr>
+            <span style="font-size:12px;color:var(--text-muted);">Changed by System</span>
+            {% endif %}
+        </div>
+
+        <!-- Diff: old vs new values -->
+        {% if log.action == 'UPDATE' and log.old_values and log.new_values %}
+        {% set old = log.old_values if log.old_values is mapping else {} %}
+        {% set new = log.new_values if log.new_values is mapping else {} %}
+        {% set changed_fields = [] %}
+        {% for key in new %}
+            {% if old.get(key) != new[key] and key not in ['changed_at'] %}
+                {% set _ = changed_fields.append(key) %}
+            {% endif %}
+        {% endfor %}
+        {% if changed_fields %}
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;font-size:12px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px;">
+                <i class="fa-solid fa-code-compare" style="margin-right:5px;"></i>Changed Fields
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+            {% for key in changed_fields %}
+            <div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;align-items:start;">
+                <span style="color:var(--text-secondary);font-weight:600;">{{ key }}</span>
+                <span style="background:rgba(239,68,68,.1);color:#ef4444;padding:2px 8px;border-radius:4px;word-break:break-all;">
+                    <i class="fa-solid fa-minus" style="font-size:8px;margin-right:3px;"></i>{{ old.get(key, '—') }}
+                </span>
+                <span style="background:rgba(62,207,142,.1);color:#3ecf8e;padding:2px 8px;border-radius:4px;word-break:break-all;">
+                    <i class="fa-solid fa-plus" style="font-size:8px;margin-right:3px;"></i>{{ new[key] }}
+                </span>
+            </div>
             {% endfor %}
-            </tbody>
-        </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% elif log.action == 'INSERT' and log.new_values %}
+        {% set new = log.new_values if log.new_values is mapping else {} %}
+        <div style="background:rgba(62,207,142,.06);border:1px solid rgba(62,207,142,.2);border-radius:8px;padding:12px 14px;font-size:12px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px;">
+                <i class="fa-solid fa-file-circle-plus" style="margin-right:5px;color:#3ecf8e;"></i>New Record Values
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            {% for key, val in new.items() %}
+            {% if val is not none and val != '' %}
+            <span style="background:var(--surface2);border-radius:5px;padding:3px 10px;color:var(--text-secondary);">
+                <strong style="color:var(--text-primary);">{{ key }}</strong>: {{ val }}
+            </span>
+            {% endif %}
+            {% endfor %}
+            </div>
+        </div>
+
+        {% elif log.action == 'DELETE' and log.old_values %}
+        {% set old = log.old_values if log.old_values is mapping else {} %}
+        <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:12px 14px;font-size:12px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px;">
+                <i class="fa-solid fa-trash" style="margin-right:5px;color:#ef4444;"></i>Deleted Record Values
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            {% for key, val in old.items() %}
+            {% if val is not none and val != '' %}
+            <span style="background:var(--surface2);border-radius:5px;padding:3px 10px;color:var(--text-secondary);">
+                <strong style="color:var(--text-primary);">{{ key }}</strong>: {{ val }}
+            </span>
+            {% endif %}
+            {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
     </div>
+    {% endfor %}
+    </div>
+
+    {% else %}
+    <div style="text-align:center;padding:64px 24px;color:var(--text-secondary);">
+        <i class="fa-solid fa-inbox" style="font-size:36px;display:block;margin-bottom:14px;color:var(--text-muted);"></i>
+        <div style="font-size:15px;font-weight:600;margin-bottom:6px;">No audit entries found</div>
+        <div style="font-size:13px;color:var(--text-muted);">
+            {% if f_action or f_table or f_user or f_date %}
+            No entries match the current filters. <a href="/audit" style="color:var(--blue);">Clear filters</a>
+            {% else %}
+            Changes to flight_plan and flight_operation will appear here automatically.
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <div class="atfm-card-footer">
         <i class="fa-solid fa-circle-info" style="margin-right:5px;"></i>
         Audit entries are written automatically by database triggers on
         <strong>flight_plan</strong> and <strong>flight_operation</strong>.
+        Showing last <strong>200</strong> entries.
     </div>
-
 </div>
 
 {% endblock %}
