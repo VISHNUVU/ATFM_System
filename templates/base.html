@@ -2,12 +2,12 @@
 <html lang="en" data-theme="dark">
 <head>
 <script>
-/* Apply saved theme before first paint to avoid flash */
+/* Apply saved theme before first paint */
 (function(){var t=localStorage.getItem('atfm-theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();
 </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATFM System</title>
+    <title>{% block page_title %}ATFM Control Center{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
@@ -15,286 +15,300 @@
 </head>
 <body>
 
-{# Skip-to-content (accessibility) #}
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 {% if session.user_id %}
 
 {# ============================================================ #}
-{#  STATUS STRIP — UTC clock + network status                   #}
+{#  APP HEADER — full-width, fixed, spans sidebar + content     #}
 {# ============================================================ #}
-<div class="status-strip" role="status">
-    <div class="strip-left">
-        <i class="fa-solid fa-shield-halved"></i>
-        ATFM &nbsp;·&nbsp; v1.0
+<header class="app-header" role="banner" id="appHeader">
+
+  <!-- Left: Brand (aligned with sidebar width) -->
+  <div class="ah-brand">
+    <button class="ah-hamburger" id="sidebarToggle"
+            aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar">
+      <i class="fa-solid fa-bars" aria-hidden="true"></i>
+    </button>
+
+    <div class="ah-logo-wrap" aria-hidden="true">
+      <svg class="ah-radar-svg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="20" r="18" stroke="rgba(10,132,255,0.2)" stroke-width="1.5"/>
+        <circle cx="20" cy="20" r="12" stroke="rgba(10,132,255,0.3)" stroke-width="1.5"/>
+        <circle cx="20" cy="20" r="6"  stroke="rgba(10,132,255,0.45)" stroke-width="1.5"/>
+        <circle cx="20" cy="20" r="2.5" fill="#0a84ff"/>
+        <line x1="20" y1="20" x2="37.5" y2="20" stroke="#0a84ff" stroke-width="1.5"
+              stroke-linecap="round" class="radar-sweep-line"/>
+        <circle cx="28" cy="12" r="1.8" fill="#0a84ff" opacity="0.65"/>
+        <circle cx="14" cy="28" r="1.2" fill="#0a84ff" opacity="0.45"/>
+      </svg>
     </div>
-    <div class="strip-center">
-        <span class="strip-dot strip-dot-normal" aria-hidden="true"></span>
-        NETWORK: NORMAL
+
+    <div class="ah-brand-text">
+      <div class="ah-brand-name">ATFM Control Center</div>
+      <div class="ah-brand-sub">Air Traffic Flow Management System</div>
     </div>
-    <div class="strip-right">
-        <i class="fa-regular fa-clock" aria-hidden="true"></i>
-        <span id="utc-clock" aria-label="Current UTC time">--:--:-- UTC</span>
+
+    <div class="ah-datetime-wrap" aria-live="polite">
+      <div class="ah-time" id="utc-clock">--:--:-- UTC</div>
+      <div class="ah-date" id="utc-date">-- --- ----</div>
     </div>
-</div>
+  </div>
+
+  <!-- Center: Search -->
+  <div class="ah-search-wrap" role="search">
+    <i class="fa-solid fa-magnifying-glass ah-search-icon" aria-hidden="true"></i>
+    <input type="text" class="ah-search-input"
+           placeholder="Search flights, airports, sectors..."
+           id="globalSearch" autocomplete="off" aria-label="Global search">
+    <span class="ah-search-kbd" aria-hidden="true">Ctrl+K</span>
+  </div>
+
+  <!-- Right: Actions -->
+  <div class="ah-actions">
+
+    <!-- Theme toggle -->
+    <button class="ah-icon-btn" id="themeToggle"
+            aria-label="Toggle day/night mode" title="Toggle day/night mode">
+      <i class="fa-solid fa-moon"  id="themeIconMoon"  aria-hidden="true"></i>
+      <i class="fa-solid fa-sun"   id="themeIconSun"   aria-hidden="true" style="display:none;"></i>
+    </button>
+
+    <!-- Bell / Alerts -->
+    <div class="bell-wrap" id="bellWrap">
+      <button class="ah-icon-btn ah-bell-btn" id="bellBtn"
+              aria-label="Alerts ({{ alert_count }} unread)"
+              aria-haspopup="true" aria-expanded="false">
+        <i class="fa-solid fa-bell" aria-hidden="true"></i>
+        {% if alert_count > 0 %}
+        <span class="bell-badge" aria-hidden="true">{{ alert_count if alert_count < 100 else '99+' }}</span>
+        {% endif %}
+      </button>
+      <div class="bell-dropdown" id="bellDropdown" role="menu" aria-label="Alert notifications">
+        <div class="bell-dd-header">
+          <span>Alerts</span>
+          <a href="/alerts" class="bell-dd-viewall">View all</a>
+        </div>
+        {% if alert_count == 0 %}
+        <div class="bell-dd-empty">
+          <i class="fa-solid fa-check-circle" style="color:var(--green);"></i>
+          No active alerts
+        </div>
+        {% else %}
+        <a href="/alerts?severity=CRITICAL" class="bell-dd-item bell-sev-critical">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          Critical alerts active
+        </a>
+        <a href="/alerts" class="bell-dd-item">
+          <i class="fa-solid fa-bell" aria-hidden="true"></i>
+          {{ alert_count }} unread alert{{ 's' if alert_count != 1 }}
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- User pill -->
+    <div class="ah-user-pill">
+      <div class="ah-user-avatar" aria-hidden="true">
+        {{ (session.full_name or '?')[0] | upper }}
+      </div>
+      <div class="ah-user-info">
+        <div class="ah-user-name">{{ session.full_name }}</div>
+        <div class="ah-user-role">{{ (session.role or '') | replace('_', ' ') }}</div>
+      </div>
+      <i class="fa-solid fa-chevron-down ah-user-chevron" aria-hidden="true"></i>
+    </div>
+
+    <!-- Logout -->
+    <a href="/logout" class="ah-logout-btn" aria-label="Sign out" title="Sign out">
+      <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+    </a>
+
+  </div>
+</header>
 
 {# ============================================================ #}
 {#  SIDEBAR                                                      #}
 {# ============================================================ #}
 <aside class="sidebar" role="navigation" aria-label="Main navigation" id="sidebar">
 
-    <div class="sidebar-brand">
-        <i class="fa-solid fa-plane-departure brand-icon" aria-hidden="true"></i>
-        <div class="brand-name">ATFM System</div>
-        <div class="brand-sub">Air Traffic Flow Mgmt</div>
-    </div>
+  <nav class="sidebar-nav-wrap">
 
     <div class="sidebar-section">
-        <div class="sidebar-section-label">Operations</div>
-        <ul class="sidebar-nav" role="list">
-            <li>
-                <a href="/dashboard"
-                   class="{{ 'active' if request.path == '/dashboard' }}"
-                   {% if request.path == '/dashboard' %}aria-current="page"{% endif %}>
-                    <i class="fa-solid fa-gauge nav-icon" aria-hidden="true"></i>
-                    Dashboard
-                </a>
-            </li>
-            <li>
-                <a href="/flights"
-                   class="{{ 'active' if request.path == '/flights' }}"
-                   {% if request.path == '/flights' %}aria-current="page"{% endif %}>
-                    <i class="fa-solid fa-plane nav-icon" aria-hidden="true"></i>
-                    Flights
-                </a>
-            </li>
-            <li>
-                <a href="/map"
-                   class="{{ 'active' if request.path == '/map' }}"
-                   {% if request.path == '/map' %}aria-current="page"{% endif %}>
-                    <i class="fa-solid fa-map-location-dot nav-icon" aria-hidden="true"></i>
-                    Map View
-                </a>
-            </li>
-            <li>
-                <a href="/alerts"
-                   class="{{ 'active' if request.path == '/alerts' }}"
-                   {% if request.path == '/alerts' %}aria-current="page"{% endif %}>
-                    <i class="fa-solid fa-bell nav-icon" aria-hidden="true"></i>
-                    Alerts
-                    {% if alert_count > 0 %}
-                    <span class="nav-badge">{{ alert_count }}</span>
-                    {% endif %}
-                </a>
-            </li>
-        </ul>
+      <ul class="sidebar-nav" role="list">
+        <li>
+          <a href="/dashboard"
+             class="{{ 'active' if request.path == '/dashboard' }}"
+             {% if request.path == '/dashboard' %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-gauge nav-icon" aria-hidden="true"></i> Dashboard
+          </a>
+        </li>
+        <li>
+          <a href="/flights"
+             class="{{ 'active' if request.path == '/flights' }}"
+             {% if request.path == '/flights' %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-plane nav-icon" aria-hidden="true"></i> Flights
+          </a>
+        </li>
+        <li>
+          <a href="/map"
+             class="{{ 'active' if request.path == '/map' }}"
+             {% if request.path == '/map' %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-map-location-dot nav-icon" aria-hidden="true"></i> Map
+          </a>
+        </li>
+        <li>
+          <a href="/alerts"
+             class="{{ 'active' if request.path == '/alerts' }}"
+             {% if request.path == '/alerts' %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-bell nav-icon" aria-hidden="true"></i> Alerts
+            {% if alert_count > 0 %}
+            <span class="nav-badge">{{ alert_count }}</span>
+            {% endif %}
+          </a>
+        </li>
+      </ul>
     </div>
 
     {% if session.role in ['system_admin', 'airline_operator'] %}
     <div class="sidebar-section">
-        <div class="sidebar-section-label">Data</div>
-        <ul class="sidebar-nav" role="list">
-            <li>
-                <a href="/upload"
-                   class="{{ 'active' if request.path == '/upload' }}"
-                   {% if request.path == '/upload' %}aria-current="page"{% endif %}>
-                    <i class="fa-solid fa-cloud-arrow-up nav-icon" aria-hidden="true"></i>
-                    Upload CSV
-                </a>
-            </li>
-        </ul>
+      <div class="sidebar-section-label">Data Import</div>
+      <ul class="sidebar-nav" role="list">
+        <li>
+          <a href="/upload"
+             class="{{ 'active' if request.path == '/upload' }}"
+             {% if request.path == '/upload' %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-cloud-arrow-up nav-icon" aria-hidden="true"></i> Upload CSV
+          </a>
+        </li>
+      </ul>
     </div>
     {% endif %}
 
-    {# ── Reference Data Management ── #}
     <div class="sidebar-section">
-        <div class="sidebar-section-label">Reference Data</div>
-        <ul class="sidebar-nav" role="list">
-            <li>
-                <a href="/data/aircraft_master"
-                   class="{{ 'active' if '/data/aircraft' in request.path }}">
-                    <i class="fa-solid fa-plane nav-icon" aria-hidden="true"></i>
-                    Aircraft
-                </a>
-            </li>
-            <li>
-                <a href="/data/aerodrome"
-                   class="{{ 'active' if '/data/aerodrome' in request.path or '/data/runway' in request.path }}">
-                    <i class="fa-solid fa-tower-observation nav-icon" aria-hidden="true"></i>
-                    Aerodromes
-                </a>
-            </li>
-            <li>
-                <a href="/data/stand"
-                   class="{{ 'active' if '/data/stand' in request.path }}">
-                    <i class="fa-solid fa-square-parking nav-icon" aria-hidden="true"></i>
-                    Stands
-                </a>
-            </li>
-            <li>
-                <a href="/data/sid_star"
-                   class="{{ 'active' if '/data/sid_star' in request.path }}">
-                    <i class="fa-solid fa-route nav-icon" aria-hidden="true"></i>
-                    SID / STAR
-                </a>
-            </li>
-            <li>
-                <a href="/data/taxiway"
-                   class="{{ 'active' if '/data/taxiway' in request.path }}">
-                    <i class="fa-solid fa-road nav-icon" aria-hidden="true"></i>
-                    Taxiways
-                </a>
-            </li>
-            <li>
-                <a href="/data/ssr_code"
-                   class="{{ 'active' if '/data/ssr_code' in request.path }}">
-                    <i class="fa-solid fa-broadcast-tower nav-icon" aria-hidden="true"></i>
-                    SSR Codes
-                </a>
-            </li>
-            <li>
-                <a href="/er-diagram"
-                   class="{{ 'active' if request.path == '/er-diagram' }}">
-                    <i class="fa-solid fa-diagram-project nav-icon" aria-hidden="true"></i>
-                    ER Diagram
-                </a>
-            </li>
-        </ul>
+      <div class="sidebar-section-label">Reference Data</div>
+      <ul class="sidebar-nav" role="list">
+        <li>
+          <a href="/data/aircraft_master"
+             class="{{ 'active' if '/data/aircraft' in request.path }}">
+            <i class="fa-solid fa-plane nav-icon" aria-hidden="true"></i> Aircraft
+          </a>
+        </li>
+        <li>
+          <a href="/data/aerodrome"
+             class="{{ 'active' if '/data/aerodrome' in request.path or '/data/runway' in request.path }}">
+            <i class="fa-solid fa-tower-observation nav-icon" aria-hidden="true"></i> Aerodromes
+          </a>
+        </li>
+        <li>
+          <a href="/data/stand"
+             class="{{ 'active' if '/data/stand' in request.path }}">
+            <i class="fa-solid fa-square-parking nav-icon" aria-hidden="true"></i> Stands
+          </a>
+        </li>
+        <li>
+          <a href="/data/sid_star"
+             class="{{ 'active' if '/data/sid_star' in request.path }}">
+            <i class="fa-solid fa-route nav-icon" aria-hidden="true"></i> SID / STAR
+          </a>
+        </li>
+        <li>
+          <a href="/data/taxiway"
+             class="{{ 'active' if '/data/taxiway' in request.path }}">
+            <i class="fa-solid fa-road nav-icon" aria-hidden="true"></i> Taxiways
+          </a>
+        </li>
+        <li>
+          <a href="/data/ssr_code"
+             class="{{ 'active' if '/data/ssr_code' in request.path }}">
+            <i class="fa-solid fa-broadcast-tower nav-icon" aria-hidden="true"></i> SSR Codes
+          </a>
+        </li>
+        <li>
+          <a href="/er-diagram"
+             class="{{ 'active' if request.path == '/er-diagram' }}">
+            <i class="fa-solid fa-diagram-project nav-icon" aria-hidden="true"></i> ER Diagram
+          </a>
+        </li>
+      </ul>
     </div>
 
     {% if session.role == 'system_admin' %}
     <div class="sidebar-section">
-        <div class="sidebar-section-label">Admin</div>
-        <ul class="sidebar-nav" role="list">
-            <li>
-                <a href="/audit"
-                   class="{{ 'active' if request.path == '/audit' }}"
-                   {% if request.path == '/audit' %}aria-current="page"{% endif %}>
-                    <i class="fa-solid fa-shield-halved nav-icon" aria-hidden="true"></i>
-                    Audit Log
-                </a>
-            </li>
-        </ul>
+      <div class="sidebar-section-label">Admin</div>
+      <ul class="sidebar-nav" role="list">
+        <li>
+          <a href="/audit"
+             class="{{ 'active' if request.path == '/audit' }}"
+             {% if request.path == '/audit' %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-shield-halved nav-icon" aria-hidden="true"></i> Audit Log
+          </a>
+        </li>
+      </ul>
     </div>
     {% endif %}
 
-    <div class="sidebar-user" aria-label="Signed-in user">
-        <div class="user-avatar" aria-hidden="true">
-            {{ (session.full_name or '?')[0] | upper }}
-        </div>
-        <div class="user-info">
-            <div class="user-name">{{ session.full_name }}</div>
-            <div class="user-role">{{ (session.role or '') | replace('_', ' ') }}</div>
-        </div>
+  </nav>
+
+  <!-- Sidebar footer: system status -->
+  <div class="sidebar-footer">
+    <div class="sf-status-row">
+      <span class="sf-dot" aria-hidden="true"></span>
+      <div>
+        <div class="sf-status-title">System Status</div>
+        <div class="sf-status-sub">All Systems Operational</div>
+      </div>
     </div>
+    <div class="sf-updated">
+      Data Last Updated
+      <span class="sf-updated-time" id="lastUpdatedTime">--:-- UTC</span>
+      <button class="sf-refresh" onclick="location.reload()" aria-label="Refresh page">
+        <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
 
 </aside>
 
 {# ============================================================ #}
-{#  MAIN CONTENT WRAPPER                                         #}
+{#  MAIN CONTENT                                                  #}
 {# ============================================================ #}
 <div class="main-content">
 
-    <header class="topbar" role="banner">
-        <div class="topbar-left">
-            <button class="hamburger-btn" id="sidebarToggle"
-                    aria-label="Toggle navigation"
-                    aria-expanded="false"
-                    aria-controls="sidebar">
-                <i class="fa-solid fa-bars" aria-hidden="true"></i>
-            </button>
-            <span class="topbar-title">{% block page_title %}ATFM System{% endblock %}</span>
-        </div>
-        <div class="topbar-right">
-            {% set rp = {
-                'system_admin':'rp-admin','airline_operator':'rp-airline',
-                'atc_controller':'rp-atc','airport_ops':'rp-airport',
-                'ai_analyst':'rp-ai','observer':'rp-observer'
-            } %}
-            <span class="role-pill {{ rp.get(session.role, 'rp-observer') }}"
-                  aria-label="Role: {{ (session.role or '') | replace('_', ' ') }}">
-                {{ (session.role or '') | replace('_', ' ') }}
-            </span>
-            {# ── Day / Night toggle ── #}
-            <button class="theme-toggle-btn" id="themeToggle"
-                    aria-label="Toggle day/night mode" title="Toggle day/night mode">
-                <i class="fa-solid fa-moon"  id="themeIconMoon"  aria-hidden="true"></i>
-                <i class="fa-solid fa-sun"   id="themeIconSun"   aria-hidden="true" style="display:none;"></i>
-            </button>
+  {# ── CRITICAL alert banner ── #}
+  {% if critical_alerts %}
+  <div class="critical-banner" role="alert" aria-live="assertive">
+    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+    <strong>CRITICAL:</strong>
+    {{ critical_alerts[0].title }}
+    {% if critical_alerts | length > 1 %}
+    <span class="critical-more">+{{ critical_alerts | length - 1 }} more</span>
+    {% endif %}
+    <a href="/alerts?severity=CRITICAL" class="critical-link">View &rsaquo;</a>
+    <form method="post" action="/alerts/dismiss/{{ critical_alerts[0].id }}"
+          style="display:inline;margin-left:auto;">
+      <button type="submit" class="critical-dismiss" aria-label="Dismiss">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </form>
+  </div>
+  {% endif %}
 
-            {# ── Notification Bell ── #}
-            <div class="bell-wrap" id="bellWrap">
-                <button class="bell-btn" id="bellBtn"
-                        aria-label="Alerts ({{ alert_count }} unread)"
-                        aria-haspopup="true" aria-expanded="false">
-                    <i class="fa-solid fa-bell" aria-hidden="true"></i>
-                    {% if alert_count > 0 %}
-                    <span class="bell-badge" aria-hidden="true">{{ alert_count if alert_count < 100 else '99+' }}</span>
-                    {% endif %}
-                </button>
-                <div class="bell-dropdown" id="bellDropdown" role="menu" aria-label="Alert notifications">
-                    <div class="bell-dd-header">
-                        <span>Alerts</span>
-                        <a href="/alerts" class="bell-dd-viewall">View all</a>
-                    </div>
-                    {% if alert_count == 0 %}
-                    <div class="bell-dd-empty">
-                        <i class="fa-solid fa-check-circle" style="color:var(--green);"></i>
-                        No active alerts
-                    </div>
-                    {% else %}
-                    <a href="/alerts?severity=CRITICAL" class="bell-dd-item bell-sev-critical">
-                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                        Critical alerts active
-                    </a>
-                    <a href="/alerts" class="bell-dd-item">
-                        <i class="fa-solid fa-bell" aria-hidden="true"></i>
-                        {{ alert_count }} unread alert{{ 's' if alert_count != 1 }}
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-
-            <a href="/logout" class="logout-btn" aria-label="Sign out">
-                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Logout
-            </a>
-        </div>
-    </header>
-
-    {# ── CRITICAL alert banner ── #}
-    {% if critical_alerts %}
-    <div class="critical-banner" role="alert" aria-live="assertive">
-        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-        <strong>CRITICAL:</strong>
-        {{ critical_alerts[0].title }}
-        {% if critical_alerts | length > 1 %}
-        <span class="critical-more">+{{ critical_alerts | length - 1 }} more</span>
-        {% endif %}
-        <a href="/alerts?severity=CRITICAL" class="critical-link">View &rsaquo;</a>
-        <form method="post" action="/alerts/dismiss/{{ critical_alerts[0].id }}"
-              style="display:inline;margin-left:auto;">
-            <button type="submit" class="critical-dismiss" aria-label="Dismiss">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </form>
+  {# Flash messages #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-wrap" style="padding:16px 26px 0;" role="alert" aria-live="polite">
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
     </div>
     {% endif %}
+  {% endwith %}
 
-    {# Flash messages #}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flash-wrap" style="padding:16px 26px 0;" role="alert" aria-live="polite">
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    {% endwith %}
-
-    <main id="main-content" class="page-body">
+  <main id="main-content" class="page-body">
 {% endif %}
 
 {# ============================================================ #}
@@ -303,8 +317,8 @@
 {% block content %}{% endblock %}
 
 {% if session.user_id %}
-    </main>{# /page-body #}
-</div>{# /main-content #}
+  </main>
+</div>
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -314,13 +328,18 @@
 <script>
 /* ---- Live UTC Clock ---- */
 (function () {
+    const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    function pad(n) { return String(n).padStart(2, '0'); }
     function tick() {
         const n = new Date();
-        const h = String(n.getUTCHours()).padStart(2, '0');
-        const m = String(n.getUTCMinutes()).padStart(2, '0');
-        const s = String(n.getUTCSeconds()).padStart(2, '0');
         const el = document.getElementById('utc-clock');
-        if (el) el.textContent = h + ':' + m + ':' + s + ' UTC';
+        const de = document.getElementById('utc-date');
+        const lu = document.getElementById('lastUpdatedTime');
+        if (el) el.textContent = pad(n.getUTCHours()) + ':' + pad(n.getUTCMinutes()) + ':' + pad(n.getUTCSeconds()) + ' UTC';
+        if (de) de.textContent = pad(n.getUTCDate()) + ' ' + MONTHS[n.getUTCMonth()] + ' ' + n.getUTCFullYear();
+        if (lu && lu.textContent === '--:-- UTC') {
+            lu.textContent = pad(n.getUTCHours()) + ':' + pad(n.getUTCMinutes()) + ' UTC';
+        }
     }
     tick();
     setInterval(tick, 1000);
@@ -336,27 +355,17 @@
     function applyTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('atfm-theme', theme);
-        if (theme === 'light') {
-            moon.style.display = 'none';
-            sun.style.display  = '';
-        } else {
-            moon.style.display = '';
-            sun.style.display  = 'none';
-        }
-        // Notify map to swap tile layer
+        if (theme === 'light') { moon.style.display = 'none'; sun.style.display = ''; }
+        else                   { moon.style.display = '';     sun.style.display  = 'none'; }
         document.dispatchEvent(new CustomEvent('themechange'));
     }
-
-    // Sync icon with current theme on load
     applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
-
     btn.addEventListener('click', function () {
-        var current = document.documentElement.getAttribute('data-theme') || 'dark';
-        applyTheme(current === 'dark' ? 'light' : 'dark');
+        applyTheme((document.documentElement.getAttribute('data-theme') || 'dark') === 'dark' ? 'light' : 'dark');
     });
 })();
 
-/* ---- Notification bell dropdown ---- */
+/* ---- Bell dropdown ---- */
 (function () {
     const btn = document.getElementById('bellBtn');
     const dd  = document.getElementById('bellDropdown');
@@ -372,42 +381,31 @@
             btn.setAttribute('aria-expanded', 'false');
         }
     });
-    // Poll for new alerts every 60 s and update badge
     function refreshBadge() {
         fetch('/api/alerts/count')
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
+            .then(r => r.json())
+            .then(d => {
                 const badge = btn.querySelector('.bell-badge');
                 if (d.count > 0) {
-                    if (badge) {
-                        badge.textContent = d.count < 100 ? d.count : '99+';
-                    } else {
-                        const b = document.createElement('span');
-                        b.className = 'bell-badge';
-                        b.textContent = d.count < 100 ? d.count : '99+';
-                        btn.appendChild(b);
-                    }
-                } else if (badge) {
-                    badge.remove();
-                }
-            })
-            .catch(function () {});
+                    if (badge) { badge.textContent = d.count < 100 ? d.count : '99+'; }
+                    else { const b = document.createElement('span'); b.className = 'bell-badge'; b.textContent = d.count < 100 ? d.count : '99+'; btn.appendChild(b); }
+                } else if (badge) { badge.remove(); }
+            }).catch(() => {});
     }
     setInterval(refreshBadge, 60000);
 })();
 
 /* ---- Mobile sidebar toggle ---- */
 (function () {
-    const btn = document.getElementById('sidebarToggle');
+    const btn     = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     if (!btn || !sidebar) return;
     btn.addEventListener('click', function () {
         const open = sidebar.classList.toggle('sidebar-open');
         this.setAttribute('aria-expanded', open);
     });
-    // Close sidebar when clicking outside on mobile
     document.addEventListener('click', function (e) {
-        if (window.innerWidth <= 768
+        if (window.innerWidth <= 900
             && sidebar.classList.contains('sidebar-open')
             && !sidebar.contains(e.target)
             && !btn.contains(e.target)) {

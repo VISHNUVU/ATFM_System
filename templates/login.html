@@ -1,67 +1,220 @@
 {% extends 'base.html' %}
 
+{% block page_title %}Sign In — ATFM Control Center{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="login-page">
-    <div class="login-card">
 
-        <div class="login-logo">
-            <span class="logo-icon">✈️</span>
-            <div class="logo-name">ATFM System</div>
-            <div class="logo-sub">Air Traffic Flow Management</div>
+  <!-- ===== LEFT: Login Form ===== -->
+  <div class="login-left">
+
+    <!-- Top mini-bar -->
+    <div class="login-header">
+      <div class="login-header-brand">
+        <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+          <circle cx="20" cy="20" r="18" stroke="rgba(10,132,255,0.25)" stroke-width="1.5"/>
+          <circle cx="20" cy="20" r="12" stroke="rgba(10,132,255,0.35)" stroke-width="1.5"/>
+          <circle cx="20" cy="20" r="6"  stroke="rgba(10,132,255,0.5)"  stroke-width="1.5"/>
+          <circle cx="20" cy="20" r="2.5" fill="#0a84ff"/>
+          <line x1="20" y1="20" x2="37.5" y2="20" stroke="#0a84ff" stroke-width="1.5"
+                stroke-linecap="round" class="login-radar-line"/>
+          <circle cx="28" cy="12" r="1.8" fill="#0a84ff" opacity="0.65"/>
+        </svg>
+        <div>
+          <div class="login-header-brand-name">ATFM Control Center</div>
+          <div class="login-header-brand-sub">Air Traffic Flow Management System</div>
+        </div>
+      </div>
+      <div class="login-header-status">
+        <span class="login-header-status-dot"></span>
+        System Status: <strong>Operational</strong>
+      </div>
+    </div>
+
+    <!-- Form area -->
+    <div class="login-form-area">
+
+      <div style="margin-bottom:32px;">
+        <h2>Welcome back</h2>
+        <p>Sign in to access the ATFM Control Center</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible"
+               style="border-radius:10px;font-size:13px;font-weight:500;margin-bottom:16px;">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="/login">
+
+        <div class="login-field">
+          <label class="login-field-label" for="login-username">Username</label>
+          <div class="login-field-input-wrap">
+            <i class="fa-solid fa-user login-field-icon"></i>
+            <input type="text" id="login-username" name="username"
+                   class="login-input" placeholder="Enter your username"
+                   autocomplete="username" required>
+          </div>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible mb-4"
-                     style="border-radius:12px; font-size:13px; font-weight:500;">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <form method="POST" action="/login">
-
-            <div style="margin-bottom:18px;">
-                <label class="f-label">
-                    <i class="fa-solid fa-user" style="margin-right:6px;color:#475569;"></i>
-                    Username
-                </label>
-                <input type="text"
-                       name="username"
-                       class="f-input"
-                       placeholder="Enter your username"
-                       autocomplete="username"
-                       required>
-            </div>
-
-            <div style="margin-bottom:28px;">
-                <label class="f-label">
-                    <i class="fa-solid fa-lock" style="margin-right:6px;color:#475569;"></i>
-                    Password
-                </label>
-                <input type="password"
-                       name="password"
-                       class="f-input"
-                       placeholder="Enter your password"
-                       autocomplete="current-password"
-                       required>
-            </div>
-
-            <button type="submit" class="login-submit">
-                <i class="fa-solid fa-right-to-bracket" style="margin-right:8px;"></i>
-                Sign In
-            </button>
-
-        </form>
-
-        <div class="login-foot">
-            <i class="fa-solid fa-shield-halved" style="margin-right:5px;"></i>
-            Secure system &mdash; authorised users only
+        <div class="login-field">
+          <label class="login-field-label" for="login-password">Password</label>
+          <div class="login-field-input-wrap">
+            <i class="fa-solid fa-lock login-field-icon"></i>
+            <input type="password" id="login-password" name="password"
+                   class="login-input" placeholder="Enter your password"
+                   autocomplete="current-password" required>
+          </div>
         </div>
+
+        <button type="submit" class="login-btn">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          Sign In
+        </button>
+
+      </form>
+
+      <div class="login-security-note">
+        <i class="fa-solid fa-shield-halved"></i>
+        Secure aviation operations access &mdash; Authorized personnel only
+      </div>
 
     </div>
+
+    <!-- Footer links -->
+    <div class="login-footer">
+      <a href="#">Help</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Contact Admin</a>
+      <div style="margin-left:auto;display:flex;gap:16px;">
+        <span class="lmo-item"><i class="fa-solid fa-shield-halved"></i> Encrypted</span>
+        <span class="lmo-item"><i class="fa-solid fa-circle-check"></i> MFA Enforced</span>
+        <span class="lmo-item"><i class="fa-solid fa-list-check"></i> Audit Logging</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== RIGHT: Live Map ===== -->
+  <div class="login-right">
+    <div id="login-map"></div>
+  </div>
+
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ---- Radar line animation on login card ---- */
+(function () {
+    const line = document.querySelector('.login-radar-line');
+    if (!line) return;
+    let angle = 0;
+    (function sweep() {
+        angle = (angle + 2) % 360;
+        line.setAttribute('transform', 'rotate(' + angle + ', 20, 20)');
+        requestAnimationFrame(sweep);
+    })();
+})();
+
+/* ---- Login map (right panel) ---- */
+(function () {
+    const mapEl = document.getElementById('login-map');
+    if (!mapEl) return;
+
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+    const map = L.map('login-map', {
+        center: [51, 10],
+        zoom: 5,
+        zoomControl: false,
+        attributionControl: false,
+        scrollWheelZoom: false,
+        dragging: false,
+        keyboard: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+    }).addTo(map);
+
+    /* Static airport rings */
+    const airports = [
+        { code: 'EGKK', name: 'LON',  lat: 51.148, lng:  -0.190, r: 60000 },
+        { code: 'EDDF', name: 'FRA',  lat: 50.033, lng:   8.570, r: 40000 },
+        { code: 'EDDM', name: 'MUC',  lat: 48.354, lng:  11.786, r: 35000 },
+        { code: 'EHAM', name: 'AMS',  lat: 52.310, lng:   4.765, r: 38000 },
+        { code: 'LFPG', name: 'CDG',  lat: 49.012, lng:   2.550, r: 42000 },
+    ];
+
+    airports.forEach(ap => {
+        /* Pulsing circle */
+        L.circle([ap.lat, ap.lng], {
+            radius: ap.r * 0.35,
+            color: '#0a84ff', weight: 1.5,
+            fill: true, fillColor: '#0a84ff', fillOpacity: 0.06
+        }).addTo(map);
+
+        /* Label */
+        const icon = L.divIcon({
+            className: '',
+            html: '<div style="background:rgba(6,13,26,0.75);border:1px solid rgba(10,132,255,0.4);border-radius:5px;padding:3px 7px;font-family:IBM Plex Mono,monospace;font-size:11px;font-weight:700;color:#c8d8f0;white-space:nowrap;">' +
+                  ap.code + '<br><span style="font-size:9px;color:#4a6080;">' + ap.name + '</span></div>',
+            iconAnchor: [0, 0]
+        });
+        L.marker([ap.lat + 0.4, ap.lng + 0.5], { icon: icon }).addTo(map);
+    });
+
+    /* Static flight markers */
+    const flights = [
+        { call: 'DLH453', fl: 'FL350', lat: 52.1,  lng:  1.8,   color: '#22c55e' },
+        { call: 'IBE6402',fl: 'FL330', lat: 45.5,  lng: -1.5,   color: '#f5a623' },
+        { call: 'AUA981', fl: 'FL370', lat: 47.2,  lng:  9.1,   color: '#22c55e' },
+        { call: 'SAS842', fl: 'FL360', lat: 55.8,  lng:  4.2,   color: '#0a84ff' },
+        { call: 'AFR1789',fl: 'FL340', lat: 47.8,  lng: -0.8,   color: '#0a84ff' },
+        { call: 'BIRD15', fl: 'FL380', lat: 59.2,  lng:  1.0,   color: '#0a84ff' },
+    ];
+
+    const planeSVG = (color) =>
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">' +
+        '<path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" ' +
+        'fill="' + color + '" transform="rotate(45,12,12)"/></svg>';
+
+    flights.forEach(f => {
+        const icon = L.divIcon({
+            className: '',
+            html: '<div style="position:relative;">' +
+                  '<div style="position:absolute;transform:translate(-50%,-50%);">' + planeSVG(f.color) + '</div>' +
+                  '<div style="position:absolute;left:12px;top:-14px;background:rgba(6,13,26,0.8);border:1px solid rgba(10,132,255,0.35);border-radius:4px;padding:2px 6px;font-family:IBM Plex Mono,monospace;font-size:10px;font-weight:700;color:#c8d8f0;white-space:nowrap;">' +
+                  f.call + '<br><span style="color:#4a6080;">' + f.fl + '</span></div></div>',
+            iconAnchor: [0, 0]
+        });
+        L.marker([f.lat, f.lng], { icon: icon }).addTo(map);
+    });
+
+    /* Route lines (dashed) */
+    const routes = [
+        [[51.148, -0.190], [50.033, 8.570]],
+        [[52.310, 4.765],  [48.354, 11.786]],
+        [[49.012, 2.550],  [52.310, 4.765]],
+        [[55.8,   4.2],    [51.148, -0.190]],
+    ];
+    routes.forEach(pts => {
+        L.polyline(pts, { color: 'rgba(10,132,255,0.3)', weight: 1, dashArray: '4 6' }).addTo(map);
+    });
+})();
+</script>
 {% endblock %}
