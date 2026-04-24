@@ -1380,6 +1380,510 @@ def api_alerts_count():
 
 
 # ================================================
+# DATA MANAGEMENT — Generic CRUD for reference tables
+# ================================================
+import csv, io
+try:
+    import openpyxl
+    EXCEL_SUPPORT = True
+except ImportError:
+    EXCEL_SUPPORT = False
+
+# ── Table registry ────────────────────────────────────────
+# Each entry defines the table, its columns, PK, display name,
+# and which roles may write (all roles can read).
+DATA_TABLES = {
+    'aircraft_master': {
+        'label': 'Aircraft Master',
+        'pk': 'ac_type',
+        'pk_type': 'str',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('ac_type','ICAO Type','text',True),
+            ('ac_classification','Classification','text',False),
+            ('manufacturer','Manufacturer','text',False),
+            ('model','Model','text',False),
+            ('max_range_nm','Max Range (nm)','number',False),
+            ('max_seats','Max Seats','number',False),
+            ('recat_category','RECAT Cat','text',False),
+            ('wake_category','Wake Cat','text',False),
+            ('wtc_icao','WTC ICAO','text',False),
+            ('mtow_kg','MTOW (kg)','number',False),
+            ('engine_count','Engines','number',False),
+            ('engine_type','Engine Type','text',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['ac_type','manufacturer','model','ac_classification','wake_category','max_range_nm','max_seats','is_deleted'],
+    },
+    'aircraft_registration': {
+        'label': 'Aircraft Registration',
+        'pk': 'ac_registration',
+        'pk_type': 'str',
+        'write_roles': ['system_admin','airline_operator'],
+        'columns': [
+            ('ac_registration','Registration','text',True),
+            ('ac_type','Aircraft Type','text',False),
+            ('airline_code','Airline Code','text',False),
+            ('manufacture_year','Mfr Year','number',False),
+            ('status','Status','text',False),
+            ('actual_seats','Actual Seats','number',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['ac_registration','ac_type','airline_code','manufacture_year','status','actual_seats'],
+    },
+    'aerodrome': {
+        'label': 'Aerodrome',
+        'pk': 'icao_code',
+        'pk_type': 'str',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('icao_code','ICAO Code','text',True),
+            ('airport_name','Airport Name','text',False),
+            ('city','City','text',False),
+            ('country','Country','text',False),
+            ('iata_code','IATA Code','text',False),
+            ('elevation_ft','Elevation (ft)','number',False),
+            ('latitude','Latitude','text',False),
+            ('longitude','Longitude','text',False),
+            ('runway_count','Runways','number',False),
+            ('timezone_offset_hours','TZ Offset','number',False),
+            ('airport_category','Category','text',False),
+            ('atc_sector','ATC Sector','text',False),
+            ('tma_name','TMA','text',False),
+            ('is_active','Active','boolean',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['icao_code','airport_name','city','country','iata_code','elevation_ft','runway_count','is_active'],
+    },
+    'runway': {
+        'label': 'Runway',
+        'pk': 'runway_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('aerodrome_icao','Aerodrome','text',False),
+            ('runway_code','RWY Code','text',False),
+            ('runway_direction_deg','Direction (°)','number',False),
+            ('length_m','Length (m)','number',False),
+            ('width_m','Width (m)','number',False),
+            ('surface_type','Surface','text',False),
+            ('ils_available','ILS','boolean',False),
+            ('tora_m','TORA (m)','number',False),
+            ('toda_m','TODA (m)','number',False),
+            ('asda_m','ASDA (m)','number',False),
+            ('lda_m','LDA (m)','number',False),
+            ('runway_status','Status','text',False),
+            ('closure_reason','Closure Reason','text',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['runway_id','aerodrome_icao','runway_code','length_m','surface_type','ils_available','runway_status'],
+    },
+    'runway_aircraft_restriction': {
+        'label': 'Runway Aircraft Restriction',
+        'pk': 'restriction_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('runway_id','Runway ID','number',False),
+            ('ac_type','Aircraft Type','text',False),
+            ('is_allowed','Allowed','boolean',False),
+            ('restriction_reason','Reason','text',False),
+        ],
+        'list_cols': ['restriction_id','runway_id','ac_type','is_allowed','restriction_reason'],
+    },
+    'runway_configuration_capacity': {
+        'label': 'Runway Config & Capacity',
+        'pk': 'config_capacity_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('aerodrome_icao','Aerodrome','text',False),
+            ('config_name','Config Name','text',False),
+            ('active_runway_dep_code','Dep Runway','text',False),
+            ('active_runway_arr_code','Arr Runway','text',False),
+            ('mode','Mode','text',False),
+            ('capacity_departures_per_hour','DEP/hr','number',False),
+            ('capacity_arrivals_per_hour','ARR/hr','number',False),
+            ('capacity_mixed_per_hour','Mixed/hr','number',False),
+            ('weather_minima_visibility_m','Vis Min (m)','number',False),
+            ('weather_minima_ceiling_ft','Ceil Min (ft)','number',False),
+            ('is_active','Active','boolean',False),
+        ],
+        'list_cols': ['config_capacity_id','aerodrome_icao','config_name','mode','capacity_departures_per_hour','capacity_arrivals_per_hour','is_active'],
+    },
+    'taxiway': {
+        'label': 'Taxiway',
+        'pk': 'taxiway_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('aerodrome_icao','Aerodrome','text',False),
+            ('taxiway_code','Code','text',False),
+            ('taxiway_name','Name','text',False),
+            ('taxiway_type','Type','text',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['taxiway_id','aerodrome_icao','taxiway_code','taxiway_name','taxiway_type'],
+    },
+    'taxiway_segment': {
+        'label': 'Taxiway Segment',
+        'pk': 'segment_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('taxiway_id','Taxiway ID','number',False),
+            ('segment_code','Code','text',False),
+            ('from_node','From Node','text',False),
+            ('to_node','To Node','text',False),
+            ('direction','Direction','text',False),
+            ('distance_nm','Distance (nm)','text',False),
+            ('base_taxi_time_sec','Base Taxi (s)','number',False),
+            ('max_speed_kts','Max Speed (kts)','number',False),
+            ('is_active','Active','boolean',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['segment_id','taxiway_id','segment_code','from_node','to_node','distance_nm','is_active'],
+    },
+    'taxiway_segment_aircraft_restriction': {
+        'label': 'Taxiway Segment Restriction',
+        'pk': 'restriction_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('segment_id','Segment ID','number',False),
+            ('ac_type','Aircraft Type','text',False),
+            ('is_allowed','Allowed','boolean',False),
+            ('restriction_reason','Reason','text',False),
+        ],
+        'list_cols': ['restriction_id','segment_id','ac_type','is_allowed','restriction_reason'],
+    },
+    'real_time_queue': {
+        'label': 'Real-Time Queue',
+        'pk': 'queue_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin','atc_controller'],
+        'columns': [
+            ('segment_id','Segment ID','number',False),
+            ('queue_length','Queue Length','number',False),
+            ('timestamp','Timestamp','datetime-local',False),
+            ('source','Source','text',False),
+        ],
+        'list_cols': ['queue_id','segment_id','queue_length','timestamp','source'],
+    },
+    'stand': {
+        'label': 'Stand',
+        'pk': 'stand_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin','airport_ops'],
+        'columns': [
+            ('aerodrome_icao','Aerodrome','text',False),
+            ('stand_code','Stand Code','text',False),
+            ('stand_type','Type','text',False),
+            ('terminal','Terminal','text',False),
+            ('is_available','Available','boolean',False),
+            ('max_ac_type','Max AC Type','text',False),
+            ('pushback_type','Pushback Type','text',False),
+            ('pushback_direction','Pushback Dir','text',False),
+            ('apron_zone','Apron Zone','text',False),
+            ('latitude','Latitude','text',False),
+            ('longitude','Longitude','text',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['stand_id','aerodrome_icao','stand_code','stand_type','terminal','is_available','max_ac_type'],
+    },
+    'stand_runway_priority_route': {
+        'label': 'Stand-Runway Priority Route',
+        'pk': 'route_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('stand_id','Stand ID','number',False),
+            ('runway_id','Runway ID','number',False),
+            ('direction','Direction','text',False),
+            ('priority_order','Priority','number',False),
+            ('total_distance_nm','Distance (nm)','text',False),
+            ('expected_taxi_time_sec','Taxi Time (s)','number',False),
+            ('route_description','Description','text',False),
+            ('is_default','Default','boolean',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['route_id','stand_id','runway_id','direction','priority_order','total_distance_nm','is_default'],
+    },
+    'stand_runway_route_segment': {
+        'label': 'Stand-Runway Route Segment',
+        'pk': 'route_segment_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('route_id','Route ID','number',False),
+            ('segment_sequence','Sequence','number',False),
+            ('segment_id','Segment ID','number',False),
+            ('cumulative_distance_nm','Cum Distance (nm)','text',False),
+            ('cumulative_taxi_time_sec','Cum Taxi (s)','number',False),
+        ],
+        'list_cols': ['route_segment_id','route_id','segment_sequence','segment_id','cumulative_distance_nm','cumulative_taxi_time_sec'],
+    },
+    'sid_star': {
+        'label': 'SID / STAR',
+        'pk': 'procedure_id',
+        'pk_type': 'int',
+        'write_roles': ['system_admin','atc_controller'],
+        'columns': [
+            ('aerodrome_icao','Aerodrome','text',False),
+            ('procedure_code','Procedure Code','text',False),
+            ('procedure_type','Type (SID/STAR)','text',False),
+            ('runway_code','Runway','text',False),
+            ('transition_point','Transition','text',False),
+            ('altitude_limit_ft','Alt Limit (ft)','number',False),
+            ('speed_restriction_kt','Speed (kt)','number',False),
+            ('is_noise_abatement','Noise Abatement','boolean',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['procedure_id','aerodrome_icao','procedure_code','procedure_type','runway_code','transition_point','altitude_limit_ft'],
+    },
+    'ssr_code': {
+        'label': 'SSR Code',
+        'pk': 'ssr_code',
+        'pk_type': 'str',
+        'write_roles': ['system_admin'],
+        'columns': [
+            ('ssr_code','SSR Code','text',True),
+            ('description','Description','text',False),
+            ('equipment_type','Equipment Type','text',False),
+            ('surveillance_capability','Surveillance Capability','text',False),
+            ('is_deleted','Deleted','boolean',False),
+        ],
+        'list_cols': ['ssr_code','description','equipment_type','surveillance_capability'],
+    },
+}
+
+def _can_write(table_key):
+    cfg = DATA_TABLES.get(table_key, {})
+    return session.get('role') in cfg.get('write_roles', [])
+
+# ── List ──────────────────────────────────────────────────
+@app.route('/data/<table_key>')
+def data_list(table_key):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    cfg = DATA_TABLES.get(table_key)
+    if not cfg:
+        flash('Unknown table.', 'danger')
+        return redirect(url_for('dashboard'))
+    q = request.args.get('q', '').strip()
+    page = max(1, int(request.args.get('page', 1)))
+    per_page = 25
+    offset = (page - 1) * per_page
+    try:
+        conn = get_db()
+        list_cols = cfg['list_cols']
+        col_str = ', '.join(f'"{c}"' for c in list_cols)
+        where = ''
+        params = []
+        if q:
+            str_cols = [c for c in list_cols if c not in (cfg['pk'],)][:3]
+            clauses = [f'CAST("{c}" AS TEXT) ILIKE %s' for c in str_cols]
+            where = 'WHERE ' + ' OR '.join(clauses) if clauses else ''
+            params = [f'%{q}%'] * len(clauses)
+        count_sql = f'SELECT COUNT(*) FROM "{table_key}" {where}'
+        with conn.cursor() as cur:
+            cur.execute(count_sql, params)
+            total = cur.fetchone()[0]
+        df = pd.read_sql(
+            f'SELECT {col_str} FROM "{table_key}" {where} ORDER BY 1 LIMIT {per_page} OFFSET {offset}',
+            conn, params=params if params else None
+        )
+        conn.close()
+        rows = df.to_dict('records')
+        total_pages = max(1, math.ceil(total / per_page))
+        return render_template('data_list.html',
+            cfg=cfg, table_key=table_key, rows=rows,
+            q=q, page=page, total=total, total_pages=total_pages,
+            can_write=_can_write(table_key),
+            username=session.get('full_name'), role=session.get('role'),
+            all_tables=DATA_TABLES,
+        )
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+        return redirect(url_for('dashboard'))
+
+# ── Add ───────────────────────────────────────────────────
+@app.route('/data/<table_key>/add', methods=['GET', 'POST'])
+def data_add(table_key):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    cfg = DATA_TABLES.get(table_key)
+    if not cfg or not _can_write(table_key):
+        flash('Access denied.', 'danger')
+        return redirect(url_for('data_list', table_key=table_key))
+    if request.method == 'POST':
+        cols, vals = [], []
+        for col, _, typ, _ in cfg['columns']:
+            v = request.form.get(col, '').strip()
+            if typ == 'boolean':
+                v = col in request.form
+            elif v == '':
+                v = None
+            cols.append(f'"{col}"')
+            vals.append(v)
+        try:
+            conn = get_db()
+            placeholders = ', '.join(['%s'] * len(cols))
+            with conn.cursor() as cur:
+                if 'created_by' in [c[0] for c in cfg['columns']]:
+                    cols.append('"created_by"'); vals.append(session.get('username'))
+                cur.execute(
+                    f'INSERT INTO "{table_key}" ({", ".join(cols)}) VALUES ({placeholders + (", %s" if "created_by" in [c[0] for c in cfg["columns"]] else "")})',
+                    vals
+                )
+            conn.commit(); conn.close()
+            flash('Record added.', 'success')
+            return redirect(url_for('data_list', table_key=table_key))
+        except Exception as e:
+            flash(f'Error: {e}', 'danger')
+    return render_template('data_form.html',
+        cfg=cfg, table_key=table_key, record=None, mode='add',
+        username=session.get('full_name'), role=session.get('role'),
+        all_tables=DATA_TABLES,
+    )
+
+# ── Edit ──────────────────────────────────────────────────
+@app.route('/data/<table_key>/<pk_val>/edit', methods=['GET', 'POST'])
+def data_edit(table_key, pk_val):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    cfg = DATA_TABLES.get(table_key)
+    if not cfg or not _can_write(table_key):
+        flash('Access denied.', 'danger')
+        return redirect(url_for('data_list', table_key=table_key))
+    pk = cfg['pk']
+    try:
+        conn = get_db()
+        df = pd.read_sql(f'SELECT * FROM "{table_key}" WHERE "{pk}" = %s', conn, params=[pk_val])
+        record = df.to_dict('records')[0] if not df.empty else None
+        if not record:
+            flash('Record not found.', 'danger')
+            return redirect(url_for('data_list', table_key=table_key))
+        if request.method == 'POST':
+            sets, vals = [], []
+            for col, _, typ, is_pk in cfg['columns']:
+                if is_pk: continue
+                v = request.form.get(col, '').strip()
+                if typ == 'boolean':
+                    v = col in request.form
+                elif v == '':
+                    v = None
+                sets.append(f'"{col}" = %s')
+                vals.append(v)
+            sets.append('"modified_at" = NOW()')
+            sets.append('"modified_by" = %s'); vals.append(session.get('username'))
+            vals.append(pk_val)
+            with conn.cursor() as cur:
+                cur.execute(
+                    f'UPDATE "{table_key}" SET {", ".join(sets)} WHERE "{pk}" = %s', vals
+                )
+            conn.commit(); conn.close()
+            flash('Record updated.', 'success')
+            return redirect(url_for('data_list', table_key=table_key))
+        conn.close()
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+        return redirect(url_for('data_list', table_key=table_key))
+    return render_template('data_form.html',
+        cfg=cfg, table_key=table_key, record=record, mode='edit',
+        pk_val=pk_val, username=session.get('full_name'), role=session.get('role'),
+        all_tables=DATA_TABLES,
+    )
+
+# ── Delete ────────────────────────────────────────────────
+@app.route('/data/<table_key>/<pk_val>/delete', methods=['POST'])
+def data_delete(table_key, pk_val):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    cfg = DATA_TABLES.get(table_key)
+    if not cfg or not _can_write(table_key):
+        flash('Access denied.', 'danger')
+        return redirect(url_for('data_list', table_key=table_key))
+    pk = cfg['pk']
+    try:
+        conn = get_db()
+        with conn.cursor() as cur:
+            # Soft-delete if column exists, otherwise hard-delete
+            col_names = [c[0] for c in cfg['columns']]
+            if 'is_deleted' in col_names:
+                cur.execute(f'UPDATE "{table_key}" SET "is_deleted"=TRUE, "modified_at"=NOW(), "modified_by"=%s WHERE "{pk}"=%s',
+                            [session.get('username'), pk_val])
+            else:
+                cur.execute(f'DELETE FROM "{table_key}" WHERE "{pk}"=%s', [pk_val])
+        conn.commit(); conn.close()
+        flash('Record deleted.', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'danger')
+    return redirect(url_for('data_list', table_key=table_key))
+
+# ── Bulk Upload ───────────────────────────────────────────
+@app.route('/data/<table_key>/upload', methods=['POST'])
+def data_upload(table_key):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    cfg = DATA_TABLES.get(table_key)
+    if not cfg or not _can_write(table_key):
+        flash('Access denied.', 'danger')
+        return redirect(url_for('data_list', table_key=table_key))
+    f = request.files.get('file')
+    if not f or not f.filename:
+        flash('No file selected.', 'danger')
+        return redirect(url_for('data_list', table_key=table_key))
+    fname = f.filename.lower()
+    rows_inserted = 0
+    try:
+        if fname.endswith('.csv'):
+            content = f.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(content))
+            data_rows = list(reader)
+        elif fname.endswith(('.xlsx', '.xls')) and EXCEL_SUPPORT:
+            wb = openpyxl.load_workbook(io.BytesIO(f.read()), read_only=True)
+            ws = wb.active
+            headers = [str(cell.value).strip() for cell in next(ws.iter_rows(max_row=1))]
+            data_rows = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                data_rows.append(dict(zip(headers, row)))
+        else:
+            flash('Unsupported format. Use CSV or XLSX.', 'danger')
+            return redirect(url_for('data_list', table_key=table_key))
+
+        valid_cols = [c[0] for c in cfg['columns']]
+        conn = get_db()
+        with conn.cursor() as cur:
+            for row in data_rows:
+                cols = [k for k in row if k in valid_cols and row[k] not in (None, '')]
+                if not cols: continue
+                vals = [row[c] for c in cols]
+                placeholders = ', '.join(['%s'] * len(cols))
+                col_str = ', '.join(f'"{c}"' for c in cols)
+                cur.execute(
+                    f'INSERT INTO "{table_key}" ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING',
+                    vals
+                )
+                rows_inserted += 1
+        conn.commit(); conn.close()
+        flash(f'{rows_inserted} records uploaded successfully.', 'success')
+    except Exception as e:
+        flash(f'Upload error: {e}', 'danger')
+    return redirect(url_for('data_list', table_key=table_key))
+
+# ── ER Diagram ────────────────────────────────────────────
+@app.route('/er-diagram')
+def er_diagram():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('er_diagram.html',
+        username=session.get('full_name'), role=session.get('role'),
+        all_tables=DATA_TABLES,
+    )
+
+
+# ================================================
 # RUN THE APPLICATION
 # debug=True shows errors clearly
 # ================================================

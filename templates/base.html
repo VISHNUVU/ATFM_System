@@ -106,6 +106,62 @@
     </div>
     {% endif %}
 
+    {# ── Reference Data Management ── #}
+    <div class="sidebar-section">
+        <div class="sidebar-section-label">Reference Data</div>
+        <ul class="sidebar-nav" role="list">
+            <li>
+                <a href="/data/aircraft_master"
+                   class="{{ 'active' if '/data/aircraft' in request.path }}">
+                    <i class="fa-solid fa-plane nav-icon" aria-hidden="true"></i>
+                    Aircraft
+                </a>
+            </li>
+            <li>
+                <a href="/data/aerodrome"
+                   class="{{ 'active' if '/data/aerodrome' in request.path or '/data/runway' in request.path }}">
+                    <i class="fa-solid fa-tower-observation nav-icon" aria-hidden="true"></i>
+                    Aerodromes
+                </a>
+            </li>
+            <li>
+                <a href="/data/stand"
+                   class="{{ 'active' if '/data/stand' in request.path }}">
+                    <i class="fa-solid fa-square-parking nav-icon" aria-hidden="true"></i>
+                    Stands
+                </a>
+            </li>
+            <li>
+                <a href="/data/sid_star"
+                   class="{{ 'active' if '/data/sid_star' in request.path }}">
+                    <i class="fa-solid fa-route nav-icon" aria-hidden="true"></i>
+                    SID / STAR
+                </a>
+            </li>
+            <li>
+                <a href="/data/taxiway"
+                   class="{{ 'active' if '/data/taxiway' in request.path }}">
+                    <i class="fa-solid fa-road nav-icon" aria-hidden="true"></i>
+                    Taxiways
+                </a>
+            </li>
+            <li>
+                <a href="/data/ssr_code"
+                   class="{{ 'active' if '/data/ssr_code' in request.path }}">
+                    <i class="fa-solid fa-broadcast-tower nav-icon" aria-hidden="true"></i>
+                    SSR Codes
+                </a>
+            </li>
+            <li>
+                <a href="/er-diagram"
+                   class="{{ 'active' if request.path == '/er-diagram' }}">
+                    <i class="fa-solid fa-diagram-project nav-icon" aria-hidden="true"></i>
+                    ER Diagram
+                </a>
+            </li>
+        </ul>
+    </div>
+
     {% if session.role == 'system_admin' %}
     <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>

@@ -1,0 +1,414 @@
+{% extends 'base.html' %}
+{% block page_title %}ER Diagram{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+.er-tab { padding:7px 18px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text-secondary);transition:all .2s; }
+.er-tab.active { background:var(--blue);color:#fff;border-color:var(--blue); }
+.mermaid svg { max-width:100% !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <h2 style="display:flex;align-items:center;gap:10px;">
+      <i class="fa-solid fa-diagram-project" style="color:var(--blue);font-size:18px;"></i>
+      Entity Relationship Diagram
+    </h2>
+    <p style="margin:0;">Database schema — 15 reference tables with relationships</p>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="er-tab active" onclick="showView('full')">Full Schema</button>
+    <button class="er-tab" onclick="showView('aircraft')">Aircraft</button>
+    <button class="er-tab" onclick="showView('aerodrome')">Aerodrome</button>
+    <button class="er-tab" onclick="showView('taxiway')">Taxiway</button>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+  {% set table_stats = [('15','Tables'),('3','Master Tables'),('8','FK Relations'),('6','Serial PKs')] %}
+  {% for val, lbl in table_stats %}
+  <div class="atfm-card" style="padding:16px 18px;margin:0;text-align:center;">
+    <div style="font-size:26px;font-weight:700;color:var(--blue);">{{ val }}</div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">{{ lbl }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Diagrams -->
+<div class="atfm-card" style="margin:0;">
+  <div class="atfm-card-header">
+    <span class="card-title-text">
+      <span class="card-dot" style="background:var(--blue);box-shadow:0 0 6px rgba(10,132,255,.5);"></span>
+      <span id="diagram-title">Full Schema ER Diagram</span>
+    </span>
+    <span style="font-size:11px;color:var(--text-muted);">Rendered with Mermaid.js</span>
+  </div>
+
+  <div style="padding:20px;overflow-x:auto;">
+
+    <!-- FULL -->
+    <div id="view-full">
+      <div class="mermaid">
+erDiagram
+    AIRCRAFT_MASTER {
+        varchar ac_type PK
+        varchar ac_classification
+        varchar manufacturer
+        varchar model
+        int max_range_nm
+        int max_seats
+        varchar recat_category
+        char wtc_icao
+        int mtow_kg
+        int engine_count
+    }
+    AIRCRAFT_REGISTRATION {
+        varchar ac_registration PK
+        varchar ac_type FK
+        varchar airline_code
+        int manufacture_year
+        varchar status
+        int actual_seats
+    }
+    AERODROME {
+        varchar icao_code PK
+        varchar airport_name
+        varchar city
+        varchar country
+        varchar iata_code
+        decimal latitude
+        decimal longitude
+        int runway_count
+        varchar airport_category
+    }
+    RUNWAY {
+        int runway_id PK
+        varchar aerodrome_icao FK
+        varchar runway_code
+        int length_m
+        int width_m
+        boolean ils_available
+        varchar runway_status
+    }
+    RUNWAY_AIRCRAFT_RESTRICTION {
+        int restriction_id PK
+        int runway_id FK
+        varchar ac_type FK
+        boolean is_allowed
+        varchar restriction_reason
+    }
+    RUNWAY_CONFIGURATION_CAPACITY {
+        int config_capacity_id PK
+        varchar aerodrome_icao FK
+        varchar config_name
+        varchar mode
+        int capacity_departures_per_hour
+        int capacity_arrivals_per_hour
+    }
+    TAXIWAY {
+        int taxiway_id PK
+        varchar aerodrome_icao FK
+        varchar taxiway_code
+        varchar taxiway_type
+    }
+    TAXIWAY_SEGMENT {
+        int segment_id PK
+        int taxiway_id FK
+        varchar segment_code
+        decimal distance_nm
+        int base_taxi_time_sec
+    }
+    TAXIWAY_SEGMENT_AIRCRAFT_RESTRICTION {
+        int restriction_id PK
+        int segment_id FK
+        varchar ac_type FK
+        boolean is_allowed
+    }
+    REAL_TIME_QUEUE {
+        int queue_id PK
+        int segment_id FK
+        int queue_length
+        timestamptz timestamp
+        varchar source
+    }
+    STAND {
+        int stand_id PK
+        varchar aerodrome_icao FK
+        varchar stand_code
+        varchar stand_type
+        varchar max_ac_type FK
+        boolean is_available
+    }
+    STAND_RUNWAY_PRIORITY_ROUTE {
+        int route_id PK
+        int stand_id FK
+        int runway_id FK
+        char direction
+        int priority_order
+        boolean is_default
+    }
+    STAND_RUNWAY_ROUTE_SEGMENT {
+        int route_segment_id PK
+        int route_id FK
+        int segment_id FK
+        int segment_sequence
+    }
+    SID_STAR {
+        int procedure_id PK
+        varchar aerodrome_icao FK
+        varchar procedure_code
+        varchar procedure_type
+        varchar runway_code
+    }
+    SSR_CODE {
+        varchar ssr_code PK
+        varchar description
+        varchar equipment_type
+        varchar surveillance_capability
+    }
+
+    AIRCRAFT_MASTER ||--o{ AIRCRAFT_REGISTRATION : "has registrations"
+    AIRCRAFT_MASTER ||--o{ RUNWAY_AIRCRAFT_RESTRICTION : "restricted on"
+    AIRCRAFT_MASTER ||--o{ TAXIWAY_SEGMENT_AIRCRAFT_RESTRICTION : "restricted on"
+    AIRCRAFT_MASTER ||--o{ STAND : "max type"
+    AERODROME ||--o{ RUNWAY : "has"
+    AERODROME ||--o{ TAXIWAY : "has"
+    AERODROME ||--o{ STAND : "has"
+    AERODROME ||--o{ RUNWAY_CONFIGURATION_CAPACITY : "configured by"
+    AERODROME ||--o{ SID_STAR : "uses"
+    RUNWAY ||--o{ RUNWAY_AIRCRAFT_RESTRICTION : "has"
+    RUNWAY ||--o{ STAND_RUNWAY_PRIORITY_ROUTE : "linked to"
+    TAXIWAY ||--o{ TAXIWAY_SEGMENT : "divided into"
+    TAXIWAY_SEGMENT ||--o{ TAXIWAY_SEGMENT_AIRCRAFT_RESTRICTION : "has"
+    TAXIWAY_SEGMENT ||--o{ REAL_TIME_QUEUE : "has queue"
+    TAXIWAY_SEGMENT ||--o{ STAND_RUNWAY_ROUTE_SEGMENT : "part of route"
+    STAND ||--o{ STAND_RUNWAY_PRIORITY_ROUTE : "routes to"
+    STAND_RUNWAY_PRIORITY_ROUTE ||--o{ STAND_RUNWAY_ROUTE_SEGMENT : "has segments"
+      </div>
+    </div>
+
+    <!-- AIRCRAFT -->
+    <div id="view-aircraft" style="display:none;">
+      <div class="mermaid">
+erDiagram
+    AIRCRAFT_MASTER {
+        varchar ac_type PK
+        varchar ac_classification
+        varchar manufacturer
+        varchar model
+        int max_range_nm
+        int max_seats
+        varchar recat_category
+        varchar wake_category
+        char wtc_icao
+        int mtow_kg
+        int engine_count
+        varchar engine_type
+        boolean is_deleted
+    }
+    AIRCRAFT_REGISTRATION {
+        varchar ac_registration PK
+        varchar ac_type FK
+        varchar airline_code
+        int manufacture_year
+        varchar status
+        int actual_seats
+        boolean is_deleted
+    }
+    RUNWAY_AIRCRAFT_RESTRICTION {
+        int restriction_id PK
+        int runway_id FK
+        varchar ac_type FK
+        boolean is_allowed
+        varchar restriction_reason
+    }
+    TAXIWAY_SEGMENT_AIRCRAFT_RESTRICTION {
+        int restriction_id PK
+        int segment_id FK
+        varchar ac_type FK
+        boolean is_allowed
+        varchar restriction_reason
+    }
+    STAND {
+        int stand_id PK
+        varchar aerodrome_icao FK
+        varchar stand_code
+        varchar max_ac_type FK
+        varchar stand_type
+        boolean is_available
+    }
+    SSR_CODE {
+        varchar ssr_code PK
+        varchar description
+        varchar equipment_type
+        varchar surveillance_capability
+    }
+
+    AIRCRAFT_MASTER ||--o{ AIRCRAFT_REGISTRATION : "has"
+    AIRCRAFT_MASTER ||--o{ RUNWAY_AIRCRAFT_RESTRICTION : "restricted on"
+    AIRCRAFT_MASTER ||--o{ TAXIWAY_SEGMENT_AIRCRAFT_RESTRICTION : "restricted on"
+    AIRCRAFT_MASTER ||--o{ STAND : "max type for"
+      </div>
+    </div>
+
+    <!-- AERODROME -->
+    <div id="view-aerodrome" style="display:none;">
+      <div class="mermaid">
+erDiagram
+    AERODROME {
+        varchar icao_code PK
+        varchar airport_name
+        varchar city
+        varchar country
+        varchar iata_code
+        decimal latitude
+        decimal longitude
+        int runway_count
+        varchar airport_category
+        varchar atc_sector
+    }
+    RUNWAY {
+        int runway_id PK
+        varchar aerodrome_icao FK
+        varchar runway_code
+        int length_m
+        int width_m
+        varchar surface_type
+        boolean ils_available
+        varchar runway_status
+    }
+    RUNWAY_CONFIGURATION_CAPACITY {
+        int config_capacity_id PK
+        varchar aerodrome_icao FK
+        varchar config_name
+        varchar mode
+        int capacity_departures_per_hour
+        int capacity_arrivals_per_hour
+    }
+    STAND {
+        int stand_id PK
+        varchar aerodrome_icao FK
+        varchar stand_code
+        varchar stand_type
+        varchar terminal
+        boolean is_available
+    }
+    SID_STAR {
+        int procedure_id PK
+        varchar aerodrome_icao FK
+        varchar procedure_code
+        varchar procedure_type
+        varchar runway_code
+        int altitude_limit_ft
+    }
+
+    AERODROME ||--o{ RUNWAY : "has"
+    AERODROME ||--o{ RUNWAY_CONFIGURATION_CAPACITY : "configured by"
+    AERODROME ||--o{ STAND : "has"
+    AERODROME ||--o{ SID_STAR : "uses"
+      </div>
+    </div>
+
+    <!-- TAXIWAY -->
+    <div id="view-taxiway" style="display:none;">
+      <div class="mermaid">
+erDiagram
+    TAXIWAY {
+        int taxiway_id PK
+        varchar aerodrome_icao FK
+        varchar taxiway_code
+        varchar taxiway_name
+        varchar taxiway_type
+    }
+    TAXIWAY_SEGMENT {
+        int segment_id PK
+        int taxiway_id FK
+        varchar segment_code
+        varchar from_node
+        varchar to_node
+        char direction
+        decimal distance_nm
+        int base_taxi_time_sec
+        int max_speed_kts
+        boolean is_active
+    }
+    TAXIWAY_SEGMENT_AIRCRAFT_RESTRICTION {
+        int restriction_id PK
+        int segment_id FK
+        varchar ac_type FK
+        boolean is_allowed
+        varchar restriction_reason
+    }
+    REAL_TIME_QUEUE {
+        int queue_id PK
+        int segment_id FK
+        int queue_length
+        timestamptz timestamp
+        varchar source
+    }
+    STAND_RUNWAY_ROUTE_SEGMENT {
+        int route_segment_id PK
+        int route_id FK
+        int segment_id FK
+        int segment_sequence
+        decimal cumulative_distance_nm
+        int cumulative_taxi_time_sec
+    }
+
+    TAXIWAY ||--o{ TAXIWAY_SEGMENT : "divided into"
+    TAXIWAY_SEGMENT ||--o{ TAXIWAY_SEGMENT_AIRCRAFT_RESTRICTION : "has restrictions"
+    TAXIWAY_SEGMENT ||--o{ REAL_TIME_QUEUE : "has queue"
+    TAXIWAY_SEGMENT ||--o{ STAND_RUNWAY_ROUTE_SEGMENT : "used in route"
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Table List -->
+<div style="margin-top:20px;">
+  <h3 style="font-size:14px;color:var(--text-secondary);margin-bottom:12px;text-transform:uppercase;letter-spacing:.08em;">
+    <i class="fa-solid fa-table" style="margin-right:6px;color:var(--blue);"></i>All Tables
+  </h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
+    {% for tkey, tcfg in all_tables.items() %}
+    <a href="{{ url_for('data_list', table_key=tkey) }}"
+       style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-decoration:none;transition:border-color .2s;"
+       onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border)'">
+      <i class="fa-solid fa-table" style="color:var(--blue);font-size:14px;flex-shrink:0;"></i>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ tcfg.label }}</div>
+        <div style="font-size:10px;color:var(--text-muted);">{{ tkey }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'default' : 'dark',
+  er: { diagramPadding: 20, layoutDirection: 'TB', minEntityWidth: 100, minEntityHeight: 75, entityPadding: 15 },
+  securityLevel: 'loose',
+});
+
+const views = { full: 'Full Schema ER Diagram', aircraft: 'Aircraft Tables', aerodrome: 'Aerodrome Tables', taxiway: 'Taxiway Tables' };
+
+function showView(name) {
+  Object.keys(views).forEach(k => {
+    document.getElementById('view-' + k).style.display = k === name ? 'block' : 'none';
+  });
+  document.getElementById('diagram-title').textContent = views[name];
+  document.querySelectorAll('.er-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+}
+</script>
+{% endblock %}

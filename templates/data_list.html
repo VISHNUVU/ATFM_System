@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block page_title %}{{ cfg.label }}{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <h2 style="display:flex;align-items:center;gap:10px;">
+      <i class="fa-solid fa-table" style="color:var(--blue);font-size:18px;"></i>
+      {{ cfg.label }}
+    </h2>
+    <p style="margin:0;">{{ total }} records &nbsp;·&nbsp; {{ cfg.label }} reference data</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    {% if can_write %}
+    <a href="{{ url_for('data_add', table_key=table_key) }}" class="btn-primary" style="font-size:13px;padding:8px 16px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+      <i class="fa-solid fa-plus"></i> Add Record
+    </a>
+    <button onclick="document.getElementById('upload-modal').style.display='flex'" class="btn-secondary" style="font-size:13px;padding:8px 16px;display:flex;align-items:center;gap:6px;">
+      <i class="fa-solid fa-file-arrow-up"></i> Bulk Upload
+    </button>
+    {% endif %}
+    <a href="{{ url_for('er_diagram') }}" style="font-size:13px;padding:8px 14px;border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);text-decoration:none;display:flex;align-items:center;gap:6px;">
+      <i class="fa-solid fa-diagram-project"></i> ER Diagram
+    </a>
+  </div>
+</div>
+
+<!-- Table Navigation -->
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+  {% for tkey, tcfg in all_tables.items() %}
+  <a href="{{ url_for('data_list', table_key=tkey) }}"
+     style="font-size:11px;padding:4px 12px;border-radius:20px;text-decoration:none;
+            {% if tkey == table_key %}background:var(--blue);color:#fff;{% else %}background:var(--surface2);color:var(--text-secondary);border:1px solid var(--border);{% endif %}
+            white-space:nowrap;">
+    {{ tcfg.label }}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Search -->
+<form method="get" style="margin-bottom:16px;display:flex;gap:10px;">
+  <div style="flex:1;position:relative;max-width:400px;">
+    <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>
+    <input name="q" value="{{ q }}" placeholder="Search {{ cfg.label }}…"
+      style="width:100%;padding:8px 12px 8px 34px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+  </div>
+  <button type="submit" class="btn-primary" style="padding:8px 18px;font-size:13px;">Search</button>
+  {% if q %}<a href="{{ url_for('data_list', table_key=table_key) }}" style="padding:8px 14px;font-size:13px;border:1px solid var(--border);border-radius:8px;color:var(--text-secondary);text-decoration:none;display:flex;align-items:center;">Clear</a>{% endif %}
+</form>
+
+<!-- Table -->
+<div class="atfm-card" style="margin:0;">
+  <div class="atfm-card-header">
+    <span class="card-title-text">
+      <span class="card-dot" style="background:var(--blue);box-shadow:0 0 6px rgba(10,132,255,.5);"></span>
+      {{ cfg.label }} — {{ total }} records
+      {% if q %}<span style="color:var(--blue);font-size:11px;margin-left:8px;">filtered</span>{% endif %}
+    </span>
+    <span style="font-size:11px;color:var(--text-muted);">Page {{ page }} / {{ total_pages }}</span>
+  </div>
+
+  <div class="atfm-table-wrap">
+    <table class="atfm-table">
+      <thead>
+        <tr>
+          {% for col in cfg.list_cols %}
+          <th>{{ col | replace('_', ' ') | title }}</th>
+          {% endfor %}
+          {% if can_write %}<th style="width:100px;">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+      <tr>
+        {% for col in cfg.list_cols %}
+        <td>
+          {% set val = row[col] %}
+          {% if val is sameas true or val == 'True' %}
+            <span style="color:var(--green);font-size:11px;font-weight:600;">✓ Yes</span>
+          {% elif val is sameas false or val == 'False' %}
+            <span style="color:var(--text-muted);font-size:11px;">— No</span>
+          {% elif val is none or val == 'None' %}
+            <span style="color:var(--text-muted);">—</span>
+          {% elif col == 'status' or col == 'runway_status' %}
+            {% set sc = {'ACTIVE':'var(--green)','OPEN':'var(--green)','DEPARTED':'var(--green)','DELAYED':'var(--amber)','MAINTENANCE':'var(--amber)','CLOSED':'var(--red)','CANCELLED':'var(--red)'} %}
+            <span style="color:{{ sc.get(val|upper, 'var(--text-secondary)') }};font-weight:600;font-size:12px;">{{ val }}</span>
+          {% else %}
+            {{ val }}
+          {% endif %}
+        </td>
+        {% endfor %}
+        {% if can_write %}
+        <td>
+          <div style="display:flex;gap:6px;">
+            <a href="{{ url_for('data_edit', table_key=table_key, pk_val=row[cfg.pk]) }}"
+               style="font-size:11px;padding:4px 10px;background:var(--blue-dim);color:var(--blue);border-radius:5px;text-decoration:none;">
+              <i class="fa-solid fa-pen"></i>
+            </a>
+            <form method="post" action="{{ url_for('data_delete', table_key=table_key, pk_val=row[cfg.pk]) }}"
+                  onsubmit="return confirm('Delete this record?')" style="margin:0;">
+              <button type="submit" style="font-size:11px;padding:4px 10px;background:var(--red-dim);color:var(--red);border:none;border-radius:5px;cursor:pointer;">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="{{ cfg.list_cols|length + (1 if can_write else 0) }}" style="text-align:center;padding:48px;color:var(--text-muted);">
+          <i class="fa-solid fa-inbox" style="font-size:28px;display:block;margin-bottom:8px;"></i>
+          No records found{% if q %} for "{{ q }}"{% endif %}.
+          {% if can_write %}<br><a href="{{ url_for('data_add', table_key=table_key) }}" style="color:var(--blue);">Add the first record</a>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <div style="display:flex;justify-content:center;gap:6px;padding:16px;">
+    {% for p in range(1, total_pages + 1) %}
+    <a href="{{ url_for('data_list', table_key=table_key, page=p, q=q) }}"
+       style="padding:5px 11px;border-radius:6px;font-size:12px;text-decoration:none;
+              {% if p == page %}background:var(--blue);color:#fff;{% else %}background:var(--surface2);color:var(--text-secondary);border:1px solid var(--border);{% endif %}">
+      {{ p }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Bulk Upload Modal -->
+{% if can_write %}
+<div id="upload-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:420px;max-width:90vw;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h3 style="margin:0;font-size:16px;">Bulk Upload — {{ cfg.label }}</h3>
+      <button onclick="document.getElementById('upload-modal').style.display='none'" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px;">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('data_upload', table_key=table_key) }}" enctype="multipart/form-data">
+      <div style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;margin-bottom:16px;">
+        <i class="fa-solid fa-cloud-arrow-up" style="font-size:28px;color:var(--text-muted);display:block;margin-bottom:8px;"></i>
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">CSV or Excel (.xlsx)</p>
+        <input type="file" name="file" accept=".csv,.xlsx,.xls" required
+               style="font-size:12px;color:var(--text-primary);">
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;font-size:11px;color:var(--text-secondary);margin-bottom:16px;">
+        <strong>Required columns:</strong><br>
+        {{ cfg.columns | map(attribute=0) | join(', ') }}
+      </div>
+      <button type="submit" class="btn-primary" style="width:100%;padding:10px;">
+        <i class="fa-solid fa-upload" style="margin-right:6px;"></i>Upload
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
