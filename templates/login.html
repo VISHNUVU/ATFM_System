@@ -6,6 +6,10 @@
 {% block head_extra %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script>
+document.documentElement.setAttribute('data-theme', 'dark');
+try { localStorage.setItem('atfm-theme', 'dark'); } catch (e) {}
+</script>
 {% endblock %}
 
 {% block content %}
@@ -219,8 +223,6 @@
 (function () {
     const mapEl = document.getElementById('login-map');
     if (!mapEl) return;
-
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 
     const map = L.map('login-map', {
         center: [51, 10],
