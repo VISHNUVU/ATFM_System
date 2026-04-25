@@ -10,108 +10,159 @@
 
 {% block content %}
 <div class="login-page">
+  <div class="login-map-backdrop">
+    <div id="login-map"></div>
+    <div class="login-map-vignette"></div>
+    <div class="login-map-grid"></div>
+  </div>
 
-  <!-- ===== LEFT: Login Form ===== -->
-  <div class="login-left">
-
-    <!-- Top mini-bar -->
-    <div class="login-header">
-      <div class="login-header-brand">
-        <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
-          <circle cx="20" cy="20" r="18" stroke="rgba(10,132,255,0.25)" stroke-width="1.5"/>
-          <circle cx="20" cy="20" r="12" stroke="rgba(10,132,255,0.35)" stroke-width="1.5"/>
-          <circle cx="20" cy="20" r="6"  stroke="rgba(10,132,255,0.5)"  stroke-width="1.5"/>
-          <circle cx="20" cy="20" r="2.5" fill="#0a84ff"/>
-          <line x1="20" y1="20" x2="37.5" y2="20" stroke="#0a84ff" stroke-width="1.5"
-                stroke-linecap="round" class="login-radar-line"/>
-          <circle cx="28" cy="12" r="1.8" fill="#0a84ff" opacity="0.65"/>
+  <header class="login-topbar">
+    <div class="login-topbar-brand">
+      <div class="login-brand-mark" aria-hidden="true">
+        <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+          <circle cx="21" cy="21" r="17.5" stroke="rgba(28,196,255,0.24)" stroke-width="2"/>
+          <circle cx="21" cy="21" r="10.5" stroke="rgba(28,196,255,0.42)" stroke-width="2"/>
+          <circle cx="21" cy="21" r="4.5" stroke="rgba(28,196,255,0.9)" stroke-width="2"/>
+          <circle cx="21" cy="21" r="2.5" fill="#1cc4ff"/>
+          <path d="M21 3.5A17.5 17.5 0 0 1 38.5 21" stroke="#1cc4ff" stroke-width="2.3" stroke-linecap="round" class="login-radar-line" data-cx="21" data-cy="21"/>
+          <circle cx="33.5" cy="11.5" r="1.8" fill="#1cc4ff" opacity="0.9"/>
         </svg>
-        <div>
-          <div class="login-header-brand-name">ATFM Control Center</div>
-          <div class="login-header-brand-sub">Air Traffic Flow Management System</div>
-        </div>
       </div>
-      <div class="login-header-status">
-        <span class="login-header-status-dot"></span>
+      <div>
+        <div class="login-topbar-title">ATFM Control Center</div>
+        <div class="login-topbar-subtitle">Air Traffic Flow Management System</div>
+      </div>
+    </div>
+
+    <div class="login-topbar-meta">
+      <div class="login-system-pill">
+        <span class="login-system-pill-dot"></span>
         System Status: <strong>Operational</strong>
       </div>
-    </div>
-
-    <!-- Form area -->
-    <div class="login-form-area">
-
-      <div style="margin-bottom:32px;">
-        <h2>Welcome back</h2>
-        <p>Sign in to access the ATFM Control Center</p>
+      <div class="login-utc-pill">
+        <i class="fa-regular fa-clock"></i>
+        <span id="loginUtcClock">--:--:-- UTC</span>
+        <span class="login-utc-date" id="loginUtcDate">-- --- ----</span>
       </div>
+    </div>
+  </header>
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible"
-               style="border-radius:10px;font-size:13px;font-weight:500;margin-bottom:16px;">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <section class="login-hero">
+    <div class="login-panel-wrap">
+      <div class="login-panel">
+        <div class="login-panel-brand">
+          <div class="login-panel-brand-mark" aria-hidden="true">
+            <svg width="92" height="92" viewBox="0 0 92 92" fill="none">
+              <circle cx="46" cy="46" r="35" stroke="rgba(28,196,255,0.16)" stroke-width="4"/>
+              <circle cx="46" cy="46" r="21" stroke="rgba(28,196,255,0.34)" stroke-width="4"/>
+              <circle cx="46" cy="46" r="9" stroke="rgba(28,196,255,0.92)" stroke-width="4"/>
+              <circle cx="46" cy="46" r="5.5" fill="#1cc4ff"/>
+              <path d="M46 11A35 35 0 0 1 81 46" stroke="#1cc4ff" stroke-width="5" stroke-linecap="round" class="login-radar-line" data-cx="46" data-cy="46"/>
+              <path d="M17 30A35 35 0 0 0 17 62" stroke="rgba(28,196,255,0.42)" stroke-width="5" stroke-linecap="round"/>
+              <path d="M30 17A35 35 0 0 0 62 17" stroke="rgba(28,196,255,0.58)" stroke-width="5" stroke-linecap="round"/>
+              <path d="M62 75A35 35 0 0 0 79 58" stroke="rgba(28,196,255,0.42)" stroke-width="5" stroke-linecap="round"/>
+            </svg>
           </div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      <form method="POST" action="/login">
-
-        <div class="login-field">
-          <label class="login-field-label" for="login-username">Username</label>
-          <div class="login-field-input-wrap">
-            <i class="fa-solid fa-user login-field-icon"></i>
-            <input type="text" id="login-username" name="username"
-                   class="login-input" placeholder="Enter your username"
-                   autocomplete="username" required>
+          <div>
+            <h1 class="login-panel-title">ATFM Control Center</h1>
+            <p class="login-panel-subtitle">Air Traffic Flow Management System</p>
           </div>
         </div>
 
-        <div class="login-field">
-          <label class="login-field-label" for="login-password">Password</label>
-          <div class="login-field-input-wrap">
-            <i class="fa-solid fa-lock login-field-icon"></i>
-            <input type="password" id="login-password" name="password"
-                   class="login-input" placeholder="Enter your password"
-                   autocomplete="current-password" required>
-          </div>
+        <div class="login-copy">
+          <h2>Welcome back</h2>
+          <p>Sign in to access the ATFM Control Center</p>
         </div>
 
-        <button type="submit" class="login-btn">
-          <i class="fa-solid fa-right-to-bracket"></i>
-          Sign In
-        </button>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible login-alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
 
-      </form>
+        <form method="POST" action="/login" class="login-form">
+          <div class="login-field">
+            <label class="login-field-label" for="login-username">Work Email / Username</label>
+            <div class="login-field-input-wrap">
+              <i class="fa-regular fa-envelope login-field-icon"></i>
+              <input type="text" id="login-username" name="username"
+                     class="login-input" placeholder="you@organization.aero"
+                     autocomplete="username" required>
+            </div>
+          </div>
 
-      <div class="login-security-note">
-        <i class="fa-solid fa-shield-halved"></i>
-        Secure aviation operations access &mdash; Authorized personnel only
+          <div class="login-field">
+            <label class="login-field-label" for="login-password">Password</label>
+            <div class="login-field-input-wrap">
+              <i class="fa-solid fa-lock login-field-icon"></i>
+              <input type="password" id="login-password" name="password"
+                     class="login-input login-input-password" placeholder="Enter your password"
+                     autocomplete="current-password" required>
+              <button type="button" class="login-password-toggle" id="loginPasswordToggle" aria-label="Show password">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="login-row">
+            <label class="login-checkbox">
+              <input type="checkbox" name="remember_me">
+              <span class="login-checkbox-box"></span>
+              <span>Remember me</span>
+            </label>
+            <a href="mailto:admin@atfm.vishnuvu.cloud" class="login-inline-link">Forgot password?</a>
+          </div>
+
+          <button type="submit" class="login-btn">
+            <i class="fa-solid fa-right-to-bracket"></i>
+            Sign In
+          </button>
+
+          <div class="login-divider">
+            <span>OR</span>
+          </div>
+
+          <button type="button" class="login-secondary-btn" disabled title="SSO integration not configured yet">
+            <i class="fa-solid fa-shield-halved"></i>
+            Sign in with SSO
+          </button>
+        </form>
+
+        <div class="login-security-note">
+          <i class="fa-solid fa-shield-halved"></i>
+          <div>
+            <strong>Secure aviation operations access</strong>
+            <span>Authorized personnel only</span>
+          </div>
+        </div>
       </div>
-
     </div>
 
-    <!-- Footer links -->
-    <div class="login-footer">
-      <a href="#">Help</a>
-      <a href="#">Privacy Policy</a>
-      <a href="#">Contact Admin</a>
-      <div style="margin-left:auto;display:flex;gap:16px;">
-        <span class="lmo-item"><i class="fa-solid fa-shield-halved"></i> Encrypted</span>
-        <span class="lmo-item"><i class="fa-solid fa-circle-check"></i> MFA Enforced</span>
-        <span class="lmo-item"><i class="fa-solid fa-list-check"></i> Audit Logging</span>
-      </div>
+    <div class="login-map-stage">
+      <div class="login-map-sector login-sector-top">NAT<br><span>North Atlantic</span></div>
+      <div class="login-map-sector login-sector-bottom">NAT<br><span>South</span></div>
     </div>
+  </section>
 
-  </div>
+  <footer class="login-bottom-bar">
+    <nav class="login-footer-nav" aria-label="Login footer links">
+      <a href="mailto:admin@atfm.vishnuvu.cloud"><i class="fa-regular fa-circle-question"></i> Help</a>
+      <a href="#"><i class="fa-regular fa-file-lines"></i> Privacy Policy</a>
+      <a href="mailto:admin@atfm.vishnuvu.cloud"><i class="fa-regular fa-envelope"></i> Contact Admin</a>
+    </nav>
 
-  <!-- ===== RIGHT: Live Map ===== -->
-  <div class="login-right">
-    <div id="login-map"></div>
-  </div>
-
+    <div class="login-compliance-strip">
+      <span class="login-compliance-item login-compliance-green"><i class="fa-solid fa-shield-halved"></i> Encrypted Connection</span>
+      <span class="login-compliance-item login-compliance-blue"><i class="fa-solid fa-lock"></i> MFA Enforced</span>
+      <span class="login-compliance-item login-compliance-purple"><i class="fa-solid fa-clipboard-check"></i> Audit Logging</span>
+      <span class="login-compliance-item login-compliance-green"><i class="fa-solid fa-circle-check"></i> Compliant</span>
+    </div>
+  </footer>
 </div>
 {% endblock %}
 
@@ -119,12 +170,47 @@
 <script>
 /* ---- Radar line animation on login card ---- */
 (function () {
-    const line = document.querySelector('.login-radar-line');
-    if (!line) return;
+    const clockEl = document.getElementById('loginUtcClock');
+    const dateEl = document.getElementById('loginUtcDate');
+    if (!clockEl || !dateEl) return;
+    const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    function pad(value) {
+        return String(value).padStart(2, '0');
+    }
+    function tick() {
+        const now = new Date();
+        clockEl.textContent = pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds()) + ' UTC';
+        dateEl.textContent = pad(now.getUTCDate()) + ' ' + MONTHS[now.getUTCMonth()] + ' ' + now.getUTCFullYear();
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
+
+(function () {
+    const input = document.getElementById('login-password');
+    const button = document.getElementById('loginPasswordToggle');
+    if (!input || !button) return;
+    button.addEventListener('click', function () {
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+        button.innerHTML = isPassword
+            ? '<i class="fa-regular fa-eye-slash"></i>'
+            : '<i class="fa-regular fa-eye"></i>';
+    });
+})();
+
+(function () {
+    const lines = document.querySelectorAll('.login-radar-line');
+    if (!lines.length) return;
     let angle = 0;
     (function sweep() {
-        angle = (angle + 2) % 360;
-        line.setAttribute('transform', 'rotate(' + angle + ', 20, 20)');
+        angle = (angle + 1.8) % 360;
+        lines.forEach(function (line) {
+            const cx = line.getAttribute('data-cx') || '20';
+            const cy = line.getAttribute('data-cy') || '20';
+            line.setAttribute('transform', 'rotate(' + angle + ', ' + cx + ', ' + cy + ')');
+        });
         requestAnimationFrame(sweep);
     })();
 })();
@@ -154,43 +240,60 @@
 
     /* Static airport rings */
     const airports = [
-        { code: 'EGKK', name: 'LON',  lat: 51.148, lng:  -0.190, r: 60000 },
-        { code: 'EDDF', name: 'FRA',  lat: 50.033, lng:   8.570, r: 40000 },
-        { code: 'EDDM', name: 'MUC',  lat: 48.354, lng:  11.786, r: 35000 },
-        { code: 'EHAM', name: 'AMS',  lat: 52.310, lng:   4.765, r: 38000 },
-        { code: 'LFPG', name: 'CDG',  lat: 49.012, lng:   2.550, r: 42000 },
+        { code: 'EGKK', name: 'LON',  lat: 51.148, lng:  -0.190, r: 110000, primary: true },
+        { code: 'EDDF', name: 'FRA',  lat: 50.033, lng:   8.570, r: 52000 },
+        { code: 'EDDM', name: 'MUC',  lat: 48.354, lng:  11.786, r: 44000 },
+        { code: 'EDUU', name: '245+', lat: 53.500, lng:  13.500, r: 0 },
+        { code: 'EDYY', name: '245+', lat: 53.200, lng:   4.700, r: 0 },
+        { code: 'LFFF', name: '245+', lat: 50.300, lng:  -6.200, r: 0 },
+        { code: 'LIRR', name: '245+', lat: 42.500, lng:  14.300, r: 0 },
+        { code: 'EIDW', name: '245+', lat: 47.900, lng:  16.300, r: 0 },
+        { code: 'LKPR', name: '245+', lat: 51.000, lng:  12.400, r: 0 },
+        { code: 'UUDD', name: '245+', lat: 53.000, lng:  18.900, r: 0 },
     ];
 
     airports.forEach(ap => {
-        /* Pulsing circle */
-        L.circle([ap.lat, ap.lng], {
-            radius: ap.r * 0.35,
-            color: '#0a84ff', weight: 1.5,
-            fill: true, fillColor: '#0a84ff', fillOpacity: 0.06
-        }).addTo(map);
+        if (ap.r > 0) {
+            [0.18, 0.32, 0.48].forEach((scale, index) => {
+                L.circle([ap.lat, ap.lng], {
+                    radius: ap.r * scale,
+                    color: ap.primary ? 'rgba(73, 222, 255, 0.82)' : 'rgba(54, 158, 255, 0.32)',
+                    weight: ap.primary ? 1.6 : 1,
+                    fill: true,
+                    fillColor: ap.primary ? '#4ddfff' : '#0a84ff',
+                    fillOpacity: ap.primary ? Math.max(0.04 - index * 0.01, 0.01) : 0.02
+                }).addTo(map);
+            });
+        }
 
-        /* Label */
         const icon = L.divIcon({
             className: '',
-            html: '<div style="background:rgba(6,13,26,0.75);border:1px solid rgba(10,132,255,0.4);border-radius:5px;padding:3px 7px;font-family:IBM Plex Mono,monospace;font-size:11px;font-weight:700;color:#c8d8f0;white-space:nowrap;">' +
-                  ap.code + '<br><span style="font-size:9px;color:#4a6080;">' + ap.name + '</span></div>',
-            iconAnchor: [0, 0]
+            html: ap.primary
+                ? '<div style="min-width:72px;text-align:center;background:rgba(10,18,31,0.72);backdrop-filter:blur(8px);border:1px solid rgba(146,174,214,0.26);border-radius:999px;padding:14px 16px;font-family:Inter,sans-serif;box-shadow:0 12px 38px rgba(0,0,0,0.32);">' +
+                  '<div style="font-size:18px;font-weight:800;color:#f2f7ff;line-height:1;">' + ap.code + '</div>' +
+                  '<div style="font-size:12px;font-weight:600;color:#d3ddef;line-height:1.2;margin-top:6px;">' + ap.name + '</div></div>'
+                : '<div style="min-width:68px;background:rgba(14,22,38,0.72);border:1px solid rgba(138,154,186,0.22);border-radius:10px;padding:7px 10px;font-family:Inter,sans-serif;box-shadow:0 10px 32px rgba(0,0,0,0.18);">' +
+                  '<div style="font-size:13px;font-weight:700;color:#a8b7d1;line-height:1.1;">' + ap.code + '</div>' +
+                  '<div style="font-size:12px;color:#c9d7ec;opacity:0.84;line-height:1.2;margin-top:4px;">' + ap.name + '</div></div>',
+            iconAnchor: ap.primary ? [36, 36] : [0, 0]
         });
-        L.marker([ap.lat + 0.4, ap.lng + 0.5], { icon: icon }).addTo(map);
+        const latOffset = ap.primary ? 0 : 0.4;
+        const lngOffset = ap.primary ? 0 : 0.5;
+        L.marker([ap.lat + latOffset, ap.lng + lngOffset], { icon: icon }).addTo(map);
     });
 
     /* Static flight markers */
     const flights = [
-        { call: 'DLH453', fl: 'FL350', lat: 52.1,  lng:  1.8,   color: '#22c55e' },
-        { call: 'IBE6402',fl: 'FL330', lat: 45.5,  lng: -1.5,   color: '#f5a623' },
-        { call: 'AUA981', fl: 'FL370', lat: 47.2,  lng:  9.1,   color: '#22c55e' },
-        { call: 'SAS842', fl: 'FL360', lat: 55.8,  lng:  4.2,   color: '#0a84ff' },
-        { call: 'AFR1789',fl: 'FL340', lat: 47.8,  lng: -0.8,   color: '#0a84ff' },
-        { call: 'BIRD15', fl: 'FL380', lat: 59.2,  lng:  1.0,   color: '#0a84ff' },
+        { call: 'DLH453', fl: 'FL350', lat: 52.1,  lng:  1.8,   color: '#66ef63' },
+        { call: 'IBE6402',fl: 'FL330', lat: 45.5,  lng: -1.5,   color: '#ffb318' },
+        { call: 'AUA981', fl: 'FL370', lat: 47.2,  lng:  9.1,   color: '#4ad391' },
+        { call: 'SAS842', fl: 'FL360', lat: 55.8,  lng:  4.2,   color: '#1cc4ff' },
+        { call: 'AFR1789',fl: 'FL340', lat: 47.8,  lng: -0.8,   color: '#1cc4ff' },
+        { call: 'BIRD15', fl: 'FL380', lat: 59.2,  lng:  1.0,   color: '#1cc4ff' },
     ];
 
     const planeSVG = (color) =>
-        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24">' +
         '<path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" ' +
         'fill="' + color + '" transform="rotate(45,12,12)"/></svg>';
 
@@ -198,9 +301,9 @@
         const icon = L.divIcon({
             className: '',
             html: '<div style="position:relative;">' +
-                  '<div style="position:absolute;transform:translate(-50%,-50%);">' + planeSVG(f.color) + '</div>' +
-                  '<div style="position:absolute;left:12px;top:-14px;background:rgba(6,13,26,0.8);border:1px solid rgba(10,132,255,0.35);border-radius:4px;padding:2px 6px;font-family:IBM Plex Mono,monospace;font-size:10px;font-weight:700;color:#c8d8f0;white-space:nowrap;">' +
-                  f.call + '<br><span style="color:#4a6080;">' + f.fl + '</span></div></div>',
+                  '<div style="position:absolute;transform:translate(-50%,-50%);filter:drop-shadow(0 0 8px ' + f.color + ');">' + planeSVG(f.color) + '</div>' +
+                  '<div style="position:absolute;left:16px;top:-18px;background:rgba(9,18,32,0.78);backdrop-filter:blur(10px);border:1px solid ' + (f.color === '#ffb318' ? 'rgba(255,179,24,0.58)' : 'rgba(28,196,255,0.34)') + ';border-radius:8px;padding:7px 10px;font-family:IBM Plex Mono,monospace;font-size:11px;font-weight:700;color:' + f.color + ';white-space:nowrap;box-shadow:0 12px 36px rgba(0,0,0,0.26);">' +
+                  f.call + '<br><span style="color:#cbd7ea;opacity:0.9;">' + f.fl + '</span></div></div>',
             iconAnchor: [0, 0]
         });
         L.marker([f.lat, f.lng], { icon: icon }).addTo(map);
@@ -214,7 +317,7 @@
         [[55.8,   4.2],    [51.148, -0.190]],
     ];
     routes.forEach(pts => {
-        L.polyline(pts, { color: 'rgba(10,132,255,0.3)', weight: 1, dashArray: '4 6' }).addTo(map);
+        L.polyline(pts, { color: 'rgba(27, 172, 255, 0.48)', weight: 1.2, dashArray: '5 7' }).addTo(map);
     });
 })();
 </script>
