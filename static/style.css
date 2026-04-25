@@ -2091,11 +2091,11 @@ th.th-sort[aria-sort="descending"] .sort-icon { opacity: 1; }
    LOGIN — SPLIT LAYOUT
    ================================================================ */
 .login-page {
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 430px 1fr;
-    background: #060c1a;
-    overflow: hidden;
+    min-height: 100vh !important;
+    display: grid !important;
+    grid-template-columns: 430px 1fr !important;
+    background: #060c1a !important;
+    overflow: hidden !important;
 }
 
 .login-left {
